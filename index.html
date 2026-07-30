@@ -147,6 +147,13 @@
   details.help { font-size: 12px; color: var(--ink-400); }
   details.help summary { cursor: pointer; }
 
+  .action-col { display: none; width: 1%; white-space: nowrap; }
+  body.admin-mode .action-col { display: table-cell; }
+  .del-btn { font: inherit; font-size: 12px; font-weight: 700; color: var(--bad); background: var(--bad-soft);
+    border: 1px solid transparent; border-radius: 7px; padding: 5px 10px; cursor: pointer; }
+  .del-btn:hover { filter: brightness(0.95); }
+  .del-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
   @media (max-width: 760px) {
     .kpis { grid-template-columns: repeat(2, 1fr); }
     .grid-2 { grid-template-columns: 1fr; }
@@ -228,6 +235,7 @@
           <tr>
             <th>Он сар</th><th>Компани</th><th>Төрөл</th>
             <th class="num">Тоо хэмжээ</th><th class="num">Хөдөлгөөн</th><th class="num">Үлдэгдэл</th>
+            <th class="num action-col">Үйлдэл</th>
           </tr>
         </thead>
         <tbody id="txnBody"></tbody>
@@ -319,7 +327,7 @@
     var points = txns.map(function (t) {
       var delta = t.type === "Орлого" ? t.amount : -t.amount;
       running += delta;
-      return { date: t.date, company: t.company, type: t.type, amount: t.amount, delta: delta, balance: running };
+      return { date: t.date, company: t.company, type: t.type, amount: t.amount, delta: delta, balance: running, _ref: t };
     });
     var income = txns.filter(function (t) { return t.type === "Орлого"; }).reduce(function (s, t) { return s + t.amount; }, 0);
     var expense = txns.filter(function (t) { return t.type === "Зарлага"; }).reduce(function (s, t) { return s + t.amount; }, 0);
@@ -465,20 +473,32 @@
     });
   }
 
-  function renderTable(derived, unit) {
+  function renderTable(derived, unit, originalTransactions) {
     var body = document.getElementById("txnBody");
     body.innerHTML = "";
     derived.points.slice().reverse().forEach(function (p) {
       var tr = document.createElement("tr");
       var isIn = p.type === "Орлого";
+      var idx = originalTransactions.indexOf(p._ref);
       tr.innerHTML =
         "<td>" + p.date + "</td>" +
         "<td>" + p.company + "</td>" +
         '<td><span class="pill ' + (isIn ? "pill--in" : "pill--out") + '">' + p.type + "</span></td>" +
         '<td class="num">' + fmt(p.amount) + " " + unit + "</td>" +
         '<td class="num ' + (isIn ? "delta--in" : "delta--out") + '">' + (isIn ? "+" : "−") + fmt(p.amount) + "</td>" +
-        '<td class="num">' + fmt(p.balance) + "</td>";
+        '<td class="num">' + fmt(p.balance) + "</td>" +
+        '<td class="num action-col"><button type="button" class="del-btn" data-idx="' + idx + '">Устгах</button></td>';
       body.appendChild(tr);
+    });
+
+    body.querySelectorAll(".del-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var idx = parseInt(btn.dataset.idx, 10);
+        var t = state.data.transactions[idx];
+        if (!t) return;
+        var ok = confirm("Устгах уу?\n\n" + t.date + " · " + t.company + " · " + t.type + " · " + fmt(t.amount) + " " + state.data.unit);
+        if (ok) deleteTransaction(idx, t, btn);
+      });
     });
   }
 
@@ -501,7 +521,7 @@
     renderKpis(derived, data);
     renderTrend(derived);
     renderBars(derived, data.unit);
-    renderTable(derived, data.unit);
+    renderTable(derived, data.unit, data.transactions);
     populateCompanySelect(data);
   }
 
@@ -523,6 +543,7 @@
   var adminPanel = document.getElementById("adminPanel");
   adminToggle.addEventListener("click", function () {
     adminPanel.classList.toggle("is-open");
+    document.body.classList.toggle("admin-mode", adminPanel.classList.contains("is-open"));
   });
 
   var tokenInput = document.getElementById("tokenInput");
@@ -557,6 +578,54 @@
     return decodeURIComponent(escape(atob(str)));
   }
 
+  function apiBaseUrl() {
+    return "https://api.github.com/repos/" + CONFIG.owner + "/" + CONFIG.repo + "/contents/" + CONFIG.path;
+  }
+
+  function deleteTransaction(idx, expected, btn) {
+    var token = localStorage.getItem(TOKEN_KEY);
+    if (!token) { setStatus("Эхлээд GitHub token-оо оруулж хадгална уу.", "error"); return; }
+
+    btn.disabled = true;
+    setStatus("Устгаж байна…", "busy");
+    var apiBase = apiBaseUrl();
+
+    fetch(apiBase + "?ref=" + CONFIG.branch, {
+      headers: { "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json" }
+    }).then(function (r) {
+      if (!r.ok) throw new Error("Одоогийн файлыг уншиж чадсангүй (HTTP " + r.status + "). Token эсвэл эрхээ шалгана уу.");
+      return r.json();
+    }).then(function (fileInfo) {
+      var current = JSON.parse(b64DecodeUtf8(fileInfo.content));
+      var t = current.transactions[idx];
+      if (!t || t.date !== expected.date || t.type !== expected.type || t.company !== expected.company || t.amount !== expected.amount) {
+        throw new Error("Файл өөр хэн нэгнээр өөрчлөгдсөн байна. Хуудсыг дахин ачаалж (F5), дахин оролдоно уу.");
+      }
+      current.transactions.splice(idx, 1);
+      var today = new Date();
+      current.lastUpdated = today.getFullYear() + "." + String(today.getMonth() + 1).padStart(2, "0") + "." + String(today.getDate()).padStart(2, "0");
+
+      var newContent = JSON.stringify(current, null, 2);
+      return fetch(apiBase, {
+        method: "PUT",
+        headers: { "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json", "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: "Гүйлгээ устгав: " + t.date + " " + t.type + " " + t.company + " " + t.amount + current.unit,
+          content: b64EncodeUtf8(newContent),
+          sha: fileInfo.sha,
+          branch: CONFIG.branch
+        })
+      });
+    }).then(function (r) {
+      if (!r.ok) return r.json().then(function (j) { throw new Error("Commit амжилтгүй (HTTP " + r.status + "): " + (j.message || "")); });
+      setStatus("Мөр устгагдлаа. Хуудас удахгүй шинэчлэгдэнэ.", "ok");
+      return loadData(true).then(render);
+    }).catch(function (err) {
+      setStatus(err.message, "error");
+      btn.disabled = false;
+    });
+  }
+
   document.getElementById("addForm").addEventListener("submit", function (e) {
     e.preventDefault();
     var token = localStorage.getItem(TOKEN_KEY);
@@ -577,7 +646,7 @@
     submitBtn.disabled = true;
     setStatus("GitHub руу илгээж байна…", "busy");
 
-    var apiBase = "https://api.github.com/repos/" + CONFIG.owner + "/" + CONFIG.repo + "/contents/" + CONFIG.path;
+    var apiBase = apiBaseUrl();
 
     fetch(apiBase + "?ref=" + CONFIG.branch, {
       headers: { "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json" }
