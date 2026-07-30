@@ -493,7 +493,7 @@
     var maxVal = Math.max.apply(null, pts.map(function (p) { return p.balance; })) * 1.1 || 1;
     var n = pts.length;
 
-    function x(i) { return n === 1 ? padL : padL + (i * plotW) / (n - 1); }
+    function x(i) { return n === 1 ? padL + plotW / 2 : padL + (i * plotW) / (n - 1); }
     function y(v) { return padT + plotH - (v / maxVal) * plotH; }
 
     var ns = "http://www.w3.org/2000/svg";
@@ -507,14 +507,21 @@
       svg.appendChild(el("line", { class: "trend-grid", x1: padL, y1: gy, x2: W - padR, y2: gy }));
     });
 
-    var linePts = pts.map(function (p, i) { return x(i) + "," + y(p.balance).toFixed(1); }).join(" L");
-    var areaPath = "M" + x(0) + "," + (padT + plotH) + " L" + linePts + " L" + x(n - 1) + "," + (padT + plotH) + " Z";
-    svg.appendChild(el("path", { class: "trend-area", d: areaPath }));
-    svg.appendChild(el("path", { class: "trend-line", d: "M" + linePts }));
+    if (n > 1) {
+      var linePts = pts.map(function (p, i) { return x(i) + "," + y(p.balance).toFixed(1); }).join(" L");
+      var areaPath = "M" + x(0) + "," + (padT + plotH) + " L" + linePts + " L" + x(n - 1) + "," + (padT + plotH) + " Z";
+      svg.appendChild(el("path", { class: "trend-area", d: areaPath }));
+      svg.appendChild(el("path", { class: "trend-line", d: "M" + linePts }));
+    } else {
+      var hint = el("text", { class: "trend-label", x: W / 2, y: padT + plotH / 2 + 28, "text-anchor": "middle" });
+      hint.textContent = "Дор хаяж 2 гүйлгээ орсноор хандлагын шугам харагдана";
+      svg.appendChild(hint);
+    }
 
     pts.forEach(function (p, i) {
       var isEnd = i === n - 1;
-      var label = el("text", { class: "trend-label", x: x(i), y: H - 14, "text-anchor": i === 0 ? "start" : isEnd ? "end" : "middle" });
+      var anchor = n === 1 ? "middle" : i === 0 ? "start" : isEnd ? "end" : "middle";
+      var label = el("text", { class: "trend-label", x: x(i), y: H - 14, "text-anchor": anchor });
       label.textContent = p.date.slice(5);
       svg.appendChild(label);
 
