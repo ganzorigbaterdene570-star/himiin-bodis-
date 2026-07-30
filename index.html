@@ -162,6 +162,16 @@
     padding: 8px 10px; border-radius: 8px; }
   .admin-panel.is-editing .editing-banner { display: block; }
 
+  /* ---------- Login gate ---------- */
+  #pageRoot { display: none; }
+  .login-gate { position: fixed; inset: 0; background: var(--surface); display: none;
+    align-items: center; justify-content: center; padding: 20px; z-index: 100; }
+  .login-card { width: 100%; max-width: 360px; background: var(--surface-raised); border: 1px solid var(--border);
+    border-radius: 14px; box-shadow: var(--shadow); padding: 28px 26px; display: flex; flex-direction: column; gap: 4px; }
+  .login-title { margin: 4px 0 6px; font-size: 22px; font-weight: 750; letter-spacing: -0.01em; }
+  .login-sub { margin: 0 0 16px; color: var(--ink-600); font-size: 13.5px; }
+  .top-actions { display: flex; gap: 8px; align-self: flex-start; }
+
   @media (max-width: 760px) {
     .kpis { grid-template-columns: repeat(2, 1fr); }
     .grid-2 { grid-template-columns: 1fr; }
@@ -170,7 +180,28 @@
 </style>
 </head>
 <body>
-<div class="page">
+
+<div class="login-gate" id="loginGate">
+  <div class="login-card">
+    <div class="eyebrow">Хязгаарлагдмал хандалт</div>
+    <h1 class="login-title">Мак Аранжин Зэс ХХК</h1>
+    <p class="login-sub">Хяналтын самбарыг харахын тулд нэвтэрнэ үү.</p>
+    <form id="loginForm">
+      <div class="field">
+        <label for="loginUser">Нэвтрэх нэр</label>
+        <input type="text" id="loginUser" autocomplete="username" required />
+      </div>
+      <div class="field" style="margin-top:10px;">
+        <label for="loginPass">Нууц үг</label>
+        <input type="password" id="loginPass" autocomplete="current-password" required />
+      </div>
+      <button class="btn btn--primary" type="submit" style="margin-top:14px; width:100%;">Нэвтрэх</button>
+    </form>
+    <div class="status-msg" id="loginStatus" style="margin-top:10px;"></div>
+  </div>
+</div>
+
+<div class="page" id="pageRoot">
 
   <header class="header">
     <div class="header__stripe"></div>
@@ -252,7 +283,10 @@
     <p class="footnote">Өгөгдөл нь энэ GitHub repo-гийн <b>data.json</b> файлаас шууд ирж байна. "Мөр нэмэх" хийхэд шууд GitHub дээр commit хийгдэнэ.</p>
   </section>
 
-  <button class="admin-toggle" id="adminToggle" type="button">⚙ Админ горим</button>
+  <div class="top-actions">
+    <button class="admin-toggle" id="adminToggle" type="button">⚙ Админ горим</button>
+    <button class="admin-toggle" id="logoutBtn" type="button">↩ Гарах</button>
+  </div>
 
   <section class="panel admin-panel" id="adminPanel">
     <div class="panel__head">
@@ -326,6 +360,50 @@
   };
 
   var state = { data: null, editIndex: null, editSnapshot: null };
+
+  // ---------- Login gate (client-side only — see admin help text for caveat) ----------
+  var AUTH = { user: "maz1", pass: "maz0928" };
+  var AUTH_KEY = "himiinBodisAuthed";
+  var pageRoot = document.getElementById("pageRoot");
+  var loginGate = document.getElementById("loginGate");
+
+  function showApp() {
+    loginGate.style.display = "none";
+    pageRoot.style.display = "flex";
+  }
+  function showGate() {
+    pageRoot.style.display = "none";
+    loginGate.style.display = "flex";
+    document.getElementById("loginUser").focus();
+  }
+
+  if (localStorage.getItem(AUTH_KEY) === "true") {
+    showApp();
+  } else {
+    showGate();
+  }
+
+  document.getElementById("loginForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var u = document.getElementById("loginUser").value.trim();
+    var p = document.getElementById("loginPass").value;
+    var statusEl = document.getElementById("loginStatus");
+    if (u === AUTH.user && p === AUTH.pass) {
+      localStorage.setItem(AUTH_KEY, "true");
+      statusEl.className = "status-msg";
+      statusEl.textContent = "";
+      showApp();
+    } else {
+      statusEl.className = "status-msg is-error";
+      statusEl.textContent = "Нэвтрэх нэр эсвэл нууц үг буруу байна.";
+    }
+  });
+
+  document.getElementById("logoutBtn").addEventListener("click", function () {
+    localStorage.removeItem(AUTH_KEY);
+    document.getElementById("loginForm").reset();
+    showGate();
+  });
 
   function fmt(n) {
     return (Math.round(n * 100) / 100).toFixed(2);
