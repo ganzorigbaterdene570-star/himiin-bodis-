@@ -132,7 +132,6 @@
     font: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border);
     background: var(--surface); color: var(--ink-900);
   }
-  .form-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
   .form-actions { display: flex; gap: 10px; align-items: center; }
   .btn { font: inherit; font-weight: 700; font-size: 13px; padding: 9px 16px; border-radius: 8px; border: 1px solid transparent;
     cursor: pointer; }
@@ -172,6 +171,22 @@
   .login-sub { margin: 0 0 16px; color: var(--ink-600); font-size: 13.5px; }
   .top-actions { display: flex; gap: 8px; align-self: flex-start; }
 
+  /* ---------- Substance tabs ---------- */
+  .substance-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+  .substance-tab { font: inherit; font-size: 13px; font-weight: 700; padding: 8px 14px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--surface-raised); color: var(--ink-600); cursor: pointer; }
+  .substance-tab:hover { border-color: var(--ink-400); }
+  .substance-tab.is-active { background: var(--copper); border-color: var(--copper); color: #fff; }
+  .substance-tab .unit-tag { font-weight: 500; opacity: 0.8; margin-left: 4px; }
+
+  .form-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+  .new-pair { display: flex; gap: 10px; }
+  .new-pair input:first-child { flex: 2; }
+  .new-pair input:last-child { flex: 1; }
+
+  @media (max-width: 900px) {
+    .form-row { grid-template-columns: 1fr 1fr 1fr; }
+  }
   @media (max-width: 760px) {
     .kpis { grid-template-columns: repeat(2, 1fr); }
     .grid-2 { grid-template-columns: 1fr; }
@@ -218,6 +233,8 @@
     </div>
   </header>
 
+  <div class="substance-tabs" id="substanceTabs"></div>
+
   <section class="kpis" id="kpis">
     <div class="kpi">
       <span class="kpi__label">Нийт орлого</span>
@@ -245,7 +262,7 @@
     <div class="panel">
       <div class="panel__head">
         <span class="panel__title">Үлдэгдлийн хандлага</span>
-        <span class="panel__hint">Гүйлгээ тус бүрийн дараах үлдэгдэл, тн</span>
+        <span class="panel__hint" id="trendHint">Гүйлгээ тус бүрийн дараах үлдэгдэл</span>
       </div>
       <div class="trend-wrap" id="trendWrap">
         <svg class="trend-svg" viewBox="0 0 600 260" id="trendSvg"></svg>
@@ -256,7 +273,7 @@
     <div class="panel">
       <div class="panel__head">
         <span class="panel__title">Нийлүүлсэн хэмжээ</span>
-        <span class="panel__hint">Компани тус бүр, тн</span>
+        <span class="panel__hint" id="barsHint">Компани тус бүр</span>
       </div>
       <div class="bars" id="companyBars"></div>
       <div class="tooltip" id="barTooltip" role="status"></div>
@@ -320,6 +337,10 @@
           <input type="date" id="fDate" required />
         </div>
         <div class="field">
+          <label for="fSubstance">Бодис</label>
+          <select id="fSubstance" required></select>
+        </div>
+        <div class="field">
           <label for="fType">Төрөл</label>
           <select id="fType" required>
             <option value="Орлого">Орлого</option>
@@ -331,8 +352,15 @@
           <select id="fCompany" required></select>
         </div>
         <div class="field">
-          <label for="fAmount">Тоо хэмжээ (тн)</label>
+          <label for="fAmount">Тоо хэмжээ</label>
           <input type="number" id="fAmount" step="0.01" min="0" required />
+        </div>
+      </div>
+      <div class="field" id="newSubstanceField" style="display:none; margin-top:10px;">
+        <label>Шинэ бодисын нэр ба хэмжих нэгж</label>
+        <div class="new-pair">
+          <input type="text" id="fNewSubstance" placeholder="Жишээ: Натрийн цианид" />
+          <input type="text" id="fNewSubstanceUnit" placeholder="Жишээ: кг" />
         </div>
       </div>
       <div class="field" id="newCompanyField" style="display:none; margin-top:10px;">
@@ -359,7 +387,12 @@
     path: "data.json"
   };
 
-  var state = { data: null, editIndex: null, editSnapshot: null };
+  var state = { data: null, editIndex: null, editSnapshot: null, selectedSubstance: null };
+
+  function unitFor(data, substanceName) {
+    var s = (data.substances || []).filter(function (x) { return x.name === substanceName; })[0];
+    return s ? s.unit : "";
+  }
 
   // ---------- Login gate (client-side only — see admin help text for caveat) ----------
   var AUTH = { user: "maz1", pass: "maz0928" };
@@ -409,8 +442,9 @@
     return (Math.round(n * 100) / 100).toFixed(2);
   }
 
-  function computeDerived(data) {
-    var txns = data.transactions.slice().sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+  function computeDerived(data, substanceName) {
+    var txns = data.transactions.filter(function (t) { return t.substance === substanceName; })
+      .slice().sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
     var running = 0;
     var points = txns.map(function (t) {
       var delta = t.type === "Орлого" ? t.amount : -t.amount;
@@ -432,14 +466,14 @@
     return { points: points, income: income, expense: expense, balance: income - expense, companyRows: companyRows };
   }
 
-  function renderKpis(derived, data) {
+  function renderKpis(derived, data, substanceName, unit) {
     document.getElementById("companyName").textContent = data.company;
-    document.getElementById("companySubtitle").textContent = "Бодис: " + data.substance + " (" + data.unit + ") · Ханган нийлүүлэгч " + (data.companies || []).length + " компани";
+    document.getElementById("companySubtitle").textContent = "Бодис: " + substanceName + " (" + unit + ") · Ханган нийлүүлэгч " + (data.companies || []).length + " компани";
     document.getElementById("lastUpdated").textContent = data.lastUpdated;
 
-    document.getElementById("kpiIncome").innerHTML = fmt(derived.income) + "<small>" + data.unit + "</small>";
-    document.getElementById("kpiExpense").innerHTML = fmt(derived.expense) + "<small>" + data.unit + "</small>";
-    document.getElementById("kpiBalance").innerHTML = fmt(derived.balance) + "<small>" + data.unit + "</small>";
+    document.getElementById("kpiIncome").innerHTML = fmt(derived.income) + "<small>" + unit + "</small>";
+    document.getElementById("kpiExpense").innerHTML = fmt(derived.expense) + "<small>" + unit + "</small>";
+    document.getElementById("kpiBalance").innerHTML = fmt(derived.balance) + "<small>" + unit + "</small>";
     document.getElementById("kpiCount").textContent = derived.points.length;
 
     if (derived.points.length) {
@@ -448,7 +482,7 @@
     }
   }
 
-  function renderTrend(derived) {
+  function renderTrend(derived, unit) {
     var svg = document.getElementById("trendSvg");
     var pts = derived.points;
     svg.innerHTML = "";
@@ -493,7 +527,7 @@
     });
 
     var endLabel = el("text", { class: "trend-endlabel", x: W - padR, y: padT + 10, "text-anchor": "end" });
-    endLabel.textContent = fmt(pts[n - 1].balance) + " тн";
+    endLabel.textContent = fmt(pts[n - 1].balance) + " " + unit;
     svg.appendChild(endLabel);
 
     var crosshair = el("line", { class: "trend-crosshair", x1: 0, y1: padT, x2: 0, y2: padT + plotH, id: "crosshair" });
@@ -508,7 +542,7 @@
       var scale = svgRect.width / W;
       var px = svgRect.left - wrapRect.left + parseFloat(hitEl.getAttribute("cx")) * scale;
       var py = parseFloat(hitEl.getAttribute("cy")) * scale;
-      tip.innerHTML = d.date + "<br>Үлдэгдэл: <b>" + d.value + " тн</b><br>Хөдөлгөөн: <b>" + d.delta + "</b>";
+      tip.innerHTML = d.date + "<br>Үлдэгдэл: <b>" + d.value + " " + unit + "</b><br>Хөдөлгөөн: <b>" + d.delta + "</b>";
       tip.style.left = px + "px"; tip.style.top = py + "px";
       tip.classList.add("is-visible");
       crosshair.setAttribute("x1", hitEl.getAttribute("cx"));
@@ -587,7 +621,7 @@
         var idx = parseInt(btn.dataset.idx, 10);
         var t = state.data.transactions[idx];
         if (!t) return;
-        var ok = confirm("Устгах уу?\n\n" + t.date + " · " + t.company + " · " + t.type + " · " + fmt(t.amount) + " " + state.data.unit);
+        var ok = confirm("Устгах уу?\n\n" + t.date + " · " + t.company + " · " + t.type + " · " + fmt(t.amount) + " " + unitFor(state.data, t.substance) + " · " + t.substance);
         if (ok) deleteTransaction(idx, t, btn);
       });
     });
@@ -601,6 +635,7 @@
 
   function populateCompanySelect(data) {
     var sel = document.getElementById("fCompany");
+    var prev = sel.value;
     sel.innerHTML = "";
     (data.companies || []).forEach(function (c) {
       var opt = document.createElement("option");
@@ -610,16 +645,64 @@
     var optNew = document.createElement("option");
     optNew.value = "__new__"; optNew.textContent = "+ Шинэ компани…";
     sel.appendChild(optNew);
+    if (prev && Array.prototype.some.call(sel.options, function (o) { return o.value === prev; })) sel.value = prev;
+  }
+
+  function populateSubstanceSelect(data) {
+    var sel = document.getElementById("fSubstance");
+    var prev = sel.value || state.selectedSubstance;
+    sel.innerHTML = "";
+    (data.substances || []).forEach(function (s) {
+      var opt = document.createElement("option");
+      opt.value = s.name; opt.textContent = s.name + " (" + s.unit + ")";
+      sel.appendChild(opt);
+    });
+    var optNew = document.createElement("option");
+    optNew.value = "__new__"; optNew.textContent = "+ Шинэ бодис…";
+    sel.appendChild(optNew);
+    if (prev && Array.prototype.some.call(sel.options, function (o) { return o.value === prev; })) sel.value = prev;
+  }
+
+  function renderSubstanceTabs(data) {
+    var wrap = document.getElementById("substanceTabs");
+    wrap.innerHTML = "";
+    (data.substances || []).forEach(function (s) {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "substance-tab" + (s.name === state.selectedSubstance ? " is-active" : "");
+      btn.innerHTML = s.name + '<span class="unit-tag">(' + s.unit + ')</span>';
+      btn.addEventListener("click", function () {
+        state.selectedSubstance = s.name;
+        renderCurrent();
+      });
+      wrap.appendChild(btn);
+    });
+  }
+
+  function renderCurrent() {
+    var data = state.data;
+    if (!data.substances || !data.substances.length) return;
+    if (!state.selectedSubstance || !data.substances.some(function (s) { return s.name === state.selectedSubstance; })) {
+      state.selectedSubstance = data.substances[0].name;
+    }
+    var unit = unitFor(data, state.selectedSubstance);
+    var derived = computeDerived(data, state.selectedSubstance);
+
+    renderSubstanceTabs(data);
+    renderKpis(derived, data, state.selectedSubstance, unit);
+    renderTrend(derived, unit);
+    renderBars(derived, unit);
+    renderTable(derived, unit, data.transactions);
+    populateCompanySelect(data);
+    populateSubstanceSelect(data);
+
+    document.getElementById("trendHint").textContent = "Гүйлгээ тус бүрийн дараах үлдэгдэл, " + unit;
+    document.getElementById("barsHint").textContent = "Компани тус бүр, " + unit;
   }
 
   function render(data) {
     state.data = data;
-    var derived = computeDerived(data);
-    renderKpis(derived, data);
-    renderTrend(derived);
-    renderBars(derived, data.unit);
-    renderTable(derived, data.unit, data.transactions);
-    populateCompanySelect(data);
+    renderCurrent();
   }
 
   function loadData(bust) {
@@ -661,6 +744,9 @@
   document.getElementById("fCompany").addEventListener("change", function () {
     document.getElementById("newCompanyField").style.display = this.value === "__new__" ? "block" : "none";
   });
+  document.getElementById("fSubstance").addEventListener("change", function () {
+    document.getElementById("newSubstanceField").style.display = this.value === "__new__" ? "block" : "none";
+  });
 
   function setStatus(msg, kind) {
     var el = document.getElementById("statusMsg");
@@ -691,10 +777,15 @@
       companySel.value = t.company;
     }
     document.getElementById("newCompanyField").style.display = "none";
+    var substanceSel = document.getElementById("fSubstance");
+    if (Array.prototype.some.call(substanceSel.options, function (o) { return o.value === t.substance; })) {
+      substanceSel.value = t.substance;
+    }
+    document.getElementById("newSubstanceField").style.display = "none";
     document.getElementById("fAmount").value = t.amount;
 
     state.editIndex = idx;
-    state.editSnapshot = { date: t.date, type: t.type, company: t.company, amount: t.amount };
+    state.editSnapshot = { date: t.date, type: t.type, company: t.company, substance: t.substance, amount: t.amount };
 
     adminPanel.classList.add("is-editing");
     document.getElementById("submitBtn").textContent = "Мөр засах, GitHub-д commit хийх";
@@ -709,6 +800,7 @@
     document.getElementById("submitBtn").textContent = "Мөр нэмж, GitHub-д commit хийх";
     document.getElementById("addForm").reset();
     document.getElementById("newCompanyField").style.display = "none";
+    document.getElementById("newSubstanceField").style.display = "none";
   }
 
   document.getElementById("cancelEditBtn").addEventListener("click", cancelEdit);
@@ -729,11 +821,14 @@
     }).then(function (fileInfo) {
       var current = JSON.parse(b64DecodeUtf8(fileInfo.content));
       var t = current.transactions[idx];
-      if (!t || t.date !== expected.date || t.type !== expected.type || t.company !== expected.company || t.amount !== expected.amount) {
+      if (!t || t.date !== expected.date || t.type !== expected.type || t.company !== expected.company || t.substance !== expected.substance || t.amount !== expected.amount) {
         throw new Error("Файл өөр хэн нэгнээр өөрчлөгдсөн байна. Хуудсыг дахин ачаалж (F5), дахин оролдоно уу.");
       }
-      current.transactions[idx] = { date: updated.date, type: updated.type, company: updated.company, amount: updated.amount };
+      current.transactions[idx] = { date: updated.date, type: updated.type, company: updated.company, substance: updated.substance, amount: updated.amount };
       if (current.companies.indexOf(updated.company) === -1) current.companies.push(updated.company);
+      if (updated.newSubstanceUnit && !current.substances.some(function (s) { return s.name === updated.substance; })) {
+        current.substances.push({ name: updated.substance, unit: updated.newSubstanceUnit });
+      }
       var today = new Date();
       current.lastUpdated = today.getFullYear() + "." + String(today.getMonth() + 1).padStart(2, "0") + "." + String(today.getDate()).padStart(2, "0");
 
@@ -742,7 +837,7 @@
         method: "PUT",
         headers: { "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json", "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: "Гүйлгээ засав: " + expected.date + " → " + updated.date + " " + updated.type + " " + updated.company + " " + updated.amount + current.unit,
+          message: "Гүйлгээ засав: " + expected.date + " → " + updated.date + " " + updated.type + " " + updated.company + " " + updated.substance + " " + updated.amount,
           content: b64EncodeUtf8(newContent),
           sha: fileInfo.sha,
           branch: CONFIG.branch
@@ -751,6 +846,7 @@
     }).then(function (r) {
       if (!r.ok) return r.json().then(function (j) { throw new Error("Commit амжилтгүй (HTTP " + r.status + "): " + (j.message || "")); });
       setStatus("Амжилттай засагдлаа! Хуудас удахгүй шинэчлэгдэнэ.", "ok");
+      state.selectedSubstance = updated.substance;
       cancelEdit();
       return loadData(true).then(render);
     }).catch(function (err) {
@@ -780,7 +876,7 @@
     }).then(function (fileInfo) {
       var current = JSON.parse(b64DecodeUtf8(fileInfo.content));
       var t = current.transactions[idx];
-      if (!t || t.date !== expected.date || t.type !== expected.type || t.company !== expected.company || t.amount !== expected.amount) {
+      if (!t || t.date !== expected.date || t.type !== expected.type || t.company !== expected.company || t.substance !== expected.substance || t.amount !== expected.amount) {
         throw new Error("Файл өөр хэн нэгнээр өөрчлөгдсөн байна. Хуудсыг дахин ачаалж (F5), дахин оролдоно уу.");
       }
       current.transactions.splice(idx, 1);
@@ -792,7 +888,7 @@
         method: "PUT",
         headers: { "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json", "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: "Гүйлгээ устгав: " + t.date + " " + t.type + " " + t.company + " " + t.amount + current.unit,
+          message: "Гүйлгээ устгав: " + t.date + " " + t.type + " " + t.company + " " + t.substance + " " + t.amount,
           content: b64EncodeUtf8(newContent),
           sha: fileInfo.sha,
           branch: CONFIG.branch
@@ -819,15 +915,26 @@
     var type = document.getElementById("fType").value;
     var companySel = document.getElementById("fCompany").value;
     var company = companySel === "__new__" ? document.getElementById("fNewCompany").value.trim() : companySel;
+    var substanceSel = document.getElementById("fSubstance").value;
+    var newSubstanceUnit = null;
+    var substance;
+    if (substanceSel === "__new__") {
+      substance = document.getElementById("fNewSubstance").value.trim();
+      newSubstanceUnit = document.getElementById("fNewSubstanceUnit").value.trim();
+    } else {
+      substance = substanceSel;
+    }
     var amount = parseFloat(document.getElementById("fAmount").value);
 
     if (!company) { setStatus("Компанийн нэр хоосон байна.", "error"); return; }
+    if (!substance) { setStatus("Бодисын нэр хоосон байна.", "error"); return; }
+    if (substanceSel === "__new__" && !newSubstanceUnit) { setStatus("Шинэ бодисын хэмжих нэгжийг оруулна уу.", "error"); return; }
     if (!amount || amount <= 0) { setStatus("Тоо хэмжээ буруу байна.", "error"); return; }
 
     var submitBtn = document.getElementById("submitBtn");
 
     if (state.editIndex !== null) {
-      updateTransaction(state.editIndex, state.editSnapshot, { date: date, type: type, company: company, amount: amount }, submitBtn);
+      updateTransaction(state.editIndex, state.editSnapshot, { date: date, type: type, company: company, substance: substance, amount: amount, newSubstanceUnit: newSubstanceUnit }, submitBtn);
       return;
     }
 
@@ -843,8 +950,11 @@
       return r.json();
     }).then(function (fileInfo) {
       var current = JSON.parse(b64DecodeUtf8(fileInfo.content));
-      current.transactions.push({ date: date, type: type, company: company, amount: amount });
+      current.transactions.push({ date: date, type: type, company: company, substance: substance, amount: amount });
       if (current.companies.indexOf(company) === -1) current.companies.push(company);
+      if (newSubstanceUnit && !current.substances.some(function (s) { return s.name === substance; })) {
+        current.substances.push({ name: substance, unit: newSubstanceUnit });
+      }
       var today = new Date();
       current.lastUpdated = today.getFullYear() + "." + String(today.getMonth() + 1).padStart(2, "0") + "." + String(today.getDate()).padStart(2, "0");
 
@@ -853,7 +963,7 @@
         method: "PUT",
         headers: { "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json", "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: "Гүйлгээ нэмэв: " + date + " " + type + " " + company + " " + amount + current.unit,
+          message: "Гүйлгээ нэмэв: " + date + " " + type + " " + company + " " + substance + " " + amount,
           content: b64EncodeUtf8(newContent),
           sha: fileInfo.sha,
           branch: CONFIG.branch
@@ -862,8 +972,10 @@
     }).then(function (r) {
       if (!r.ok) return r.json().then(function (j) { throw new Error("Commit амжилтгүй (HTTP " + r.status + "): " + (j.message || "")); });
       setStatus("Амжилттай! GitHub дээр commit хийгдлээ. Хуудас удахгүй шинэчлэгдэнэ.", "ok");
+      state.selectedSubstance = substance;
       document.getElementById("addForm").reset();
       document.getElementById("newCompanyField").style.display = "none";
+      document.getElementById("newSubstanceField").style.display = "none";
       return loadData(true).then(render);
     }).catch(function (err) {
       setStatus(err.message, "error");
