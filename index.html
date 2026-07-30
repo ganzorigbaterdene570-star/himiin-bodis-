@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Мак Аранжин Зэс ХХК — Хяналтын самбар</title>
+<style>
+  :root {
+    --surface: #F2F3EF;
+    --surface-raised: #FFFFFF;
+    --surface-sunken: #E6E8E1;
+    --border: #D7DACF;
+    --ink-900: #14171B;
+    --ink-600: #4C525A;
+    --ink-400: #80868D;
+    --copper: #B15A26;
+    --copper-ink: #8A4419;
+    --copper-soft: rgba(177, 90, 38, 0.12);
+    --copper-soft-strong: rgba(177, 90, 38, 0.22);
+    --good: #2F7D53;
+    --good-soft: rgba(47, 125, 83, 0.12);
+    --bad: #AE3B30;
+    --bad-soft: rgba(174, 59, 48, 0.10);
+    --focus: #2F6FB2;
+    --shadow: 0 1px 2px rgba(20, 23, 27, 0.04), 0 6px 20px rgba(20, 23, 27, 0.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --surface: #14171B; --surface-raised: #1C2126; --surface-sunken: #0E1114;
+      --border: #2B3138; --ink-900: #F1F1EC; --ink-600: #B7BCC2; --ink-400: #808891;
+      --copper: #E0975A; --copper-ink: #F3C79A;
+      --copper-soft: rgba(224, 151, 90, 0.16); --copper-soft-strong: rgba(224, 151, 90, 0.28);
+      --good: #59B584; --good-soft: rgba(89, 181, 132, 0.14);
+      --bad: #E17E72; --bad-soft: rgba(225, 126, 114, 0.14);
+      --focus: #6FA8DC; --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 10px 30px rgba(0,0,0,0.35);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--surface); color: var(--ink-900);
+    font-family: "Segoe UI", -apple-system, "Helvetica Neue", Roboto, Arial, sans-serif; }
+  body { padding: 28px 20px 60px; display: flex; justify-content: center; }
+  .page { width: 100%; max-width: 1080px; display: flex; flex-direction: column; gap: 22px; }
+  a { color: var(--copper-ink); }
+  a:focus-visible, [tabindex]:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible {
+    outline: 2px solid var(--focus); outline-offset: 2px;
+  }
+
+  .header { background: var(--surface-raised); border: 1px solid var(--border); border-radius: 14px;
+    box-shadow: var(--shadow); overflow: hidden; }
+  .header__stripe { height: 5px; background: repeating-linear-gradient(135deg, var(--copper) 0px, var(--copper) 10px, transparent 10px, transparent 20px); opacity: 0.55; }
+  .header__body { padding: 22px 26px 20px; display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 14px; }
+  .eyebrow { font-size: 11.5px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--copper); }
+  .header__title { margin: 4px 0 0; font-size: clamp(22px, 3vw, 30px); font-weight: 750; letter-spacing: -0.01em; text-wrap: balance; }
+  .header__subtitle { margin: 4px 0 0; color: var(--ink-600); font-size: 14.5px; }
+  .header__meta { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-600);
+    background: var(--surface-sunken); border: 1px solid var(--border); padding: 5px 10px; border-radius: 999px; }
+  .badge__dot { width: 6px; height: 6px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 3px var(--good-soft); }
+
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .kpi { background: var(--surface-raised); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px;
+    box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .kpi--primary { border-color: var(--copper); background: linear-gradient(180deg, var(--copper-soft), transparent 65%), var(--surface-raised); }
+  .kpi__label { font-size: 11.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400); }
+  .kpi--primary .kpi__label { color: var(--copper-ink); }
+  .kpi__value { font-size: clamp(22px, 3vw, 28px); font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+  .kpi__value small { font-size: 13px; font-weight: 600; color: var(--ink-400); margin-left: 4px; }
+  .kpi__note { font-size: 12.5px; color: var(--ink-400); }
+
+  .grid-2 { display: grid; grid-template-columns: 1.3fr 1fr; gap: 14px; align-items: stretch; }
+  .panel { background: var(--surface-raised); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px 16px;
+    box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .panel__head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .panel__title { font-size: 14.5px; font-weight: 700; }
+  .panel__hint { font-size: 12px; color: var(--ink-400); }
+
+  .trend-wrap { position: relative; }
+  .trend-svg { width: 100%; height: auto; display: block; overflow: visible; }
+  .trend-area { fill: var(--copper); opacity: 0.14; }
+  .trend-line { fill: none; stroke: var(--copper); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .trend-grid { stroke: var(--border); stroke-width: 1; }
+  .trend-dot { fill: var(--surface-raised); stroke: var(--copper); stroke-width: 2; }
+  .trend-dot--end { fill: var(--copper); stroke: var(--surface-raised); stroke-width: 2; }
+  .trend-hit { fill: transparent; cursor: pointer; }
+  .trend-label { font-size: 10.5px; fill: var(--ink-400); }
+  .trend-endlabel { font-size: 12.5px; font-weight: 700; fill: var(--copper-ink); }
+  .trend-crosshair { stroke: var(--ink-400); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0; pointer-events: none; }
+
+  .tooltip { position: absolute; pointer-events: none; background: var(--ink-900); color: var(--surface);
+    font-size: 12px; padding: 6px 9px; border-radius: 7px; line-height: 1.35; white-space: nowrap;
+    transform: translate(-50%, -120%); opacity: 0; transition: opacity 0.1s ease; z-index: 5; box-shadow: var(--shadow); }
+  .tooltip.is-visible { opacity: 1; }
+  .tooltip b { font-variant-numeric: tabular-nums; }
+
+  .bars { display: flex; flex-direction: column; gap: 14px; margin-top: 4px; }
+  .bar-row { display: flex; flex-direction: column; gap: 5px; }
+  .bar-row__top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 13px; }
+  .bar-row__name { color: var(--ink-900); font-weight: 600; }
+  .bar-row__note { color: var(--ink-400); font-size: 11.5px; font-weight: 500; }
+  .bar-row__value { font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+  .bar-track { position: relative; height: 10px; border-radius: 6px; background: var(--surface-sunken);
+    border: 1px solid var(--border); overflow: hidden; cursor: pointer; }
+  .bar-fill { position: absolute; inset: 0 auto 0 0; border-radius: 6px; background: linear-gradient(90deg, var(--copper-soft-strong), var(--copper)); }
+
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 640px; }
+  thead th { text-align: left; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-400);
+    font-weight: 700; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  tbody td { padding: 10px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--surface-sunken); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .pill { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; }
+  .pill--in { background: var(--good-soft); color: var(--good); }
+  .pill--out { background: var(--bad-soft); color: var(--bad); }
+  .delta--in { color: var(--good); font-weight: 700; }
+  .delta--out { color: var(--bad); font-weight: 700; }
+  .muted { color: var(--ink-400); }
+
+  .footnote { font-size: 12.5px; color: var(--ink-400); padding: 2px 4px 0; }
+  .footnote b { color: var(--ink-600); }
+
+  /* ---------- Admin ---------- */
+  .admin-toggle { align-self: flex-start; background: none; border: 1px solid var(--border); color: var(--ink-400);
+    font-size: 12px; padding: 6px 12px; border-radius: 999px; cursor: pointer; }
+  .admin-toggle:hover { color: var(--ink-600); border-color: var(--ink-400); }
+  .admin-panel { display: none; }
+  .admin-panel.is-open { display: flex; flex-direction: column; gap: 14px; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 12px; font-weight: 700; color: var(--ink-600); }
+  .field input, .field select {
+    font: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--ink-900);
+  }
+  .form-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .form-actions { display: flex; gap: 10px; align-items: center; }
+  .btn { font: inherit; font-weight: 700; font-size: 13px; padding: 9px 16px; border-radius: 8px; border: 1px solid transparent;
+    cursor: pointer; }
+  .btn--primary { background: var(--copper); color: #fff; }
+  .btn--primary:disabled { opacity: 0.55; cursor: not-allowed; }
+  .btn--ghost { background: transparent; border-color: var(--border); color: var(--ink-600); }
+  .token-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+  .status-msg { font-size: 12.5px; padding: 8px 10px; border-radius: 8px; display: none; }
+  .status-msg.is-error { display: block; background: var(--bad-soft); color: var(--bad); }
+  .status-msg.is-ok { display: block; background: var(--good-soft); color: var(--good); }
+  .status-msg.is-busy { display: block; background: var(--surface-sunken); color: var(--ink-600); }
+  details.help { font-size: 12px; color: var(--ink-400); }
+  details.help summary { cursor: pointer; }
+
+  @media (max-width: 760px) {
+    .kpis { grid-template-columns: repeat(2, 1fr); }
+    .grid-2 { grid-template-columns: 1fr; }
+    .form-row { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="header">
+    <div class="header__stripe"></div>
+    <div class="header__body">
+      <div>
+        <div class="eyebrow">Химийн бодисын орлого / зарлагын хяналт</div>
+        <h1 class="header__title" id="companyName">—</h1>
+        <p class="header__subtitle" id="companySubtitle">—</p>
+      </div>
+      <div class="header__meta">
+        <span class="badge"><span class="badge__dot"></span>Сүүлд шинэчилсэн: <span id="lastUpdated">—</span></span>
+        <span class="footnote">Эх сурвалж: <b>GitHub · data.json</b></span>
+      </div>
+    </div>
+  </header>
+
+  <section class="kpis" id="kpis">
+    <div class="kpi">
+      <span class="kpi__label">Нийт орлого</span>
+      <span class="kpi__value" id="kpiIncome">—</span>
+      <span class="kpi__note" id="kpiIncomeNote">&nbsp;</span>
+    </div>
+    <div class="kpi">
+      <span class="kpi__label">Нийт зарлага</span>
+      <span class="kpi__value" id="kpiExpense">—</span>
+      <span class="kpi__note">&nbsp;</span>
+    </div>
+    <div class="kpi kpi--primary">
+      <span class="kpi__label">Одоогийн үлдэгдэл</span>
+      <span class="kpi__value" id="kpiBalance">—</span>
+      <span class="kpi__note">Орлого − Зарлага</span>
+    </div>
+    <div class="kpi">
+      <span class="kpi__label">Гүйлгээний тоо</span>
+      <span class="kpi__value" id="kpiCount">—</span>
+      <span class="kpi__note" id="kpiRange">&nbsp;</span>
+    </div>
+  </section>
+
+  <section class="grid-2">
+    <div class="panel">
+      <div class="panel__head">
+        <span class="panel__title">Үлдэгдлийн хандлага</span>
+        <span class="panel__hint">Гүйлгээ тус бүрийн дараах үлдэгдэл, тн</span>
+      </div>
+      <div class="trend-wrap" id="trendWrap">
+        <svg class="trend-svg" viewBox="0 0 600 260" id="trendSvg"></svg>
+        <div class="tooltip" id="trendTooltip" role="status"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel__head">
+        <span class="panel__title">Нийлүүлсэн хэмжээ</span>
+        <span class="panel__hint">Компани тус бүр, тн</span>
+      </div>
+      <div class="bars" id="companyBars"></div>
+      <div class="tooltip" id="barTooltip" role="status"></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel__head">
+      <span class="panel__title">Сүүлийн гүйлгээнүүд</span>
+      <span class="panel__hint">Шинээс хуучин руу</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Он сар</th><th>Компани</th><th>Төрөл</th>
+            <th class="num">Тоо хэмжээ</th><th class="num">Хөдөлгөөн</th><th class="num">Үлдэгдэл</th>
+          </tr>
+        </thead>
+        <tbody id="txnBody"></tbody>
+      </table>
+    </div>
+    <p class="footnote">Өгөгдөл нь энэ GitHub repo-гийн <b>data.json</b> файлаас шууд ирж байна. "Мөр нэмэх" хийхэд шууд GitHub дээр commit хийгдэнэ.</p>
+  </section>
+
+  <button class="admin-toggle" id="adminToggle" type="button">⚙ Админ горим</button>
+
+  <section class="panel admin-panel" id="adminPanel">
+    <div class="panel__head">
+      <span class="panel__title">Админ · Шинэ гүйлгээ нэмэх</span>
+      <span class="panel__hint">GitHub-д шууд commit хийнэ</span>
+    </div>
+
+    <div class="token-row">
+      <div class="field" style="flex:1; min-width:220px;">
+        <label for="tokenInput">GitHub Personal Access Token</label>
+        <input type="password" id="tokenInput" placeholder="ghp_xxx... эсвэл github_pat_xxx..." autocomplete="off" />
+      </div>
+      <button class="btn btn--ghost" id="tokenSaveBtn" type="button">Хадгалах</button>
+      <button class="btn btn--ghost" id="tokenClearBtn" type="button">Устгах</button>
+    </div>
+    <details class="help">
+      <summary>Token хаанаас авах вэ?</summary>
+      <p>
+        GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens →
+        "Generate new token". Repository access: <b>Only select repositories → himiin-bodis-</b>.
+        Permissions: <b>Contents → Read and write</b>. Бусад бүх зөвшөөрлийг хоосон орхино.
+        Token зөвхөн энэ компьютерийн browser дээр (localStorage) хадгалагдана, надад ч, серверт ч илгээгдэхгүй.
+      </p>
+    </details>
+
+    <form id="addForm">
+      <div class="form-row">
+        <div class="field">
+          <label for="fDate">Огноо</label>
+          <input type="date" id="fDate" required />
+        </div>
+        <div class="field">
+          <label for="fType">Төрөл</label>
+          <select id="fType" required>
+            <option value="Орлого">Орлого</option>
+            <option value="Зарлага">Зарлага</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="fCompany">Компани</label>
+          <select id="fCompany" required></select>
+        </div>
+        <div class="field">
+          <label for="fAmount">Тоо хэмжээ (тн)</label>
+          <input type="number" id="fAmount" step="0.01" min="0" required />
+        </div>
+      </div>
+      <div class="field" id="newCompanyField" style="display:none; margin-top:10px;">
+        <label for="fNewCompany">Шинэ компанийн нэр</label>
+        <input type="text" id="fNewCompany" placeholder="Жишээ: Шинэ ХХК" />
+      </div>
+      <div class="form-actions" style="margin-top:12px;">
+        <button class="btn btn--primary" id="submitBtn" type="submit">Мөр нэмж, GitHub-д commit хийх</button>
+        <span class="footnote">Commit хийгдсэний дараа сайт 1 минут орчимд шинэчлэгдэж болно.</span>
+      </div>
+    </form>
+    <div class="status-msg" id="statusMsg"></div>
+  </section>
+
+</div>
+
+<script>
+(function () {
+  var CONFIG = {
+    owner: "ganzorigbaterdene570-star",
+    repo: "himiin-bodis-",
+    branch: "main",
+    path: "data.json"
+  };
+
+  var state = { data: null };
+
+  function fmt(n) {
+    return (Math.round(n * 100) / 100).toFixed(2);
+  }
+
+  function computeDerived(data) {
+    var txns = data.transactions.slice().sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+    var running = 0;
+    var points = txns.map(function (t) {
+      var delta = t.type === "Орлого" ? t.amount : -t.amount;
+      running += delta;
+      return { date: t.date, company: t.company, type: t.type, amount: t.amount, delta: delta, balance: running };
+    });
+    var income = txns.filter(function (t) { return t.type === "Орлого"; }).reduce(function (s, t) { return s + t.amount; }, 0);
+    var expense = txns.filter(function (t) { return t.type === "Зарлага"; }).reduce(function (s, t) { return s + t.amount; }, 0);
+
+    var byCompany = {};
+    (data.companies || []).forEach(function (c) { byCompany[c] = 0; });
+    txns.forEach(function (t) {
+      if (t.type === "Орлого") byCompany[t.company] = (byCompany[t.company] || 0) + t.amount;
+    });
+    var companyRows = Object.keys(byCompany).map(function (name) {
+      return { name: name, amount: byCompany[name] };
+    }).sort(function (a, b) { return b.amount - a.amount; });
+
+    return { points: points, income: income, expense: expense, balance: income - expense, companyRows: companyRows };
+  }
+
+  function renderKpis(derived, data) {
+    document.getElementById("companyName").textContent = data.company;
+    document.getElementById("companySubtitle").textContent = "Бодис: " + data.substance + " (" + data.unit + ") · Ханган нийлүүлэгч " + (data.companies || []).length + " компани";
+    document.getElementById("lastUpdated").textContent = data.lastUpdated;
+
+    document.getElementById("kpiIncome").innerHTML = fmt(derived.income) + "<small>" + data.unit + "</small>";
+    document.getElementById("kpiExpense").innerHTML = fmt(derived.expense) + "<small>" + data.unit + "</small>";
+    document.getElementById("kpiBalance").innerHTML = fmt(derived.balance) + "<small>" + data.unit + "</small>";
+    document.getElementById("kpiCount").textContent = derived.points.length;
+
+    if (derived.points.length) {
+      document.getElementById("kpiRange").textContent = derived.points[0].date + " – " + derived.points[derived.points.length - 1].date;
+      document.getElementById("kpiIncomeNote").textContent = (data.companies || []).length + " нийлүүлэгчээс";
+    }
+  }
+
+  function renderTrend(derived) {
+    var svg = document.getElementById("trendSvg");
+    var pts = derived.points;
+    svg.innerHTML = "";
+    if (!pts.length) return;
+
+    var W = 600, H = 260, padL = 10, padR = 10, padT = 20, padB = 36;
+    var plotW = W - padL - padR, plotH = H - padT - padB;
+    var maxVal = Math.max.apply(null, pts.map(function (p) { return p.balance; })) * 1.1 || 1;
+    var n = pts.length;
+
+    function x(i) { return n === 1 ? padL : padL + (i * plotW) / (n - 1); }
+    function y(v) { return padT + plotH - (v / maxVal) * plotH; }
+
+    var ns = "http://www.w3.org/2000/svg";
+    function el(tag, attrs) {
+      var e = document.createElementNS(ns, tag);
+      for (var k in attrs) e.setAttribute(k, attrs[k]);
+      return e;
+    }
+
+    [padT, padT + plotH / 2, padT + plotH].forEach(function (gy) {
+      svg.appendChild(el("line", { class: "trend-grid", x1: padL, y1: gy, x2: W - padR, y2: gy }));
+    });
+
+    var linePts = pts.map(function (p, i) { return x(i) + "," + y(p.balance).toFixed(1); }).join(" L");
+    var areaPath = "M" + x(0) + "," + (padT + plotH) + " L" + linePts + " L" + x(n - 1) + "," + (padT + plotH) + " Z";
+    svg.appendChild(el("path", { class: "trend-area", d: areaPath }));
+    svg.appendChild(el("path", { class: "trend-line", d: "M" + linePts }));
+
+    pts.forEach(function (p, i) {
+      var isEnd = i === n - 1;
+      var label = el("text", { class: "trend-label", x: x(i), y: H - 14, "text-anchor": i === 0 ? "start" : isEnd ? "end" : "middle" });
+      label.textContent = p.date.slice(5);
+      svg.appendChild(label);
+
+      var dot = el("circle", { class: isEnd ? "trend-dot trend-dot--end" : "trend-dot", cx: x(i), cy: y(p.balance).toFixed(1), r: isEnd ? 6 : 4 });
+      svg.appendChild(dot);
+
+      var hit = el("circle", { class: "trend-hit", cx: x(i), cy: y(p.balance).toFixed(1), r: 14, tabindex: "0" });
+      hit.dataset.date = p.date; hit.dataset.value = fmt(p.balance); hit.dataset.delta = (p.delta >= 0 ? "+" : "") + fmt(p.delta);
+      svg.appendChild(hit);
+    });
+
+    var endLabel = el("text", { class: "trend-endlabel", x: W - padR, y: padT + 10, "text-anchor": "end" });
+    endLabel.textContent = fmt(pts[n - 1].balance) + " тн";
+    svg.appendChild(endLabel);
+
+    var crosshair = el("line", { class: "trend-crosshair", x1: 0, y1: padT, x2: 0, y2: padT + plotH, id: "crosshair" });
+    svg.appendChild(crosshair);
+
+    var wrap = document.getElementById("trendWrap");
+    var tip = document.getElementById("trendTooltip");
+    function show(hitEl) {
+      var d = hitEl.dataset;
+      var svgRect = svg.getBoundingClientRect();
+      var wrapRect = wrap.getBoundingClientRect();
+      var scale = svgRect.width / W;
+      var px = svgRect.left - wrapRect.left + parseFloat(hitEl.getAttribute("cx")) * scale;
+      var py = parseFloat(hitEl.getAttribute("cy")) * scale;
+      tip.innerHTML = d.date + "<br>Үлдэгдэл: <b>" + d.value + " тн</b><br>Хөдөлгөөн: <b>" + d.delta + "</b>";
+      tip.style.left = px + "px"; tip.style.top = py + "px";
+      tip.classList.add("is-visible");
+      crosshair.setAttribute("x1", hitEl.getAttribute("cx"));
+      crosshair.setAttribute("x2", hitEl.getAttribute("cx"));
+      crosshair.style.opacity = 1;
+    }
+    function hide() { tip.classList.remove("is-visible"); crosshair.style.opacity = 0; }
+    svg.querySelectorAll(".trend-hit").forEach(function (h) {
+      h.addEventListener("mouseenter", function () { show(h); });
+      h.addEventListener("mousemove", function () { show(h); });
+      h.addEventListener("mouseleave", hide);
+      h.addEventListener("focus", function () { show(h); });
+      h.addEventListener("blur", hide);
+    });
+  }
+
+  function renderBars(derived, unit) {
+    var wrap = document.getElementById("companyBars");
+    wrap.innerHTML = "";
+    var max = Math.max.apply(null, derived.companyRows.map(function (r) { return r.amount; })) || 1;
+    var tip = document.getElementById("barTooltip");
+    var total = derived.income || 1;
+
+    derived.companyRows.forEach(function (row) {
+      var pct = (row.amount / max) * 100;
+      var rowEl = document.createElement("div");
+      rowEl.className = "bar-row";
+      rowEl.innerHTML =
+        '<div class="bar-row__top">' +
+          '<span class="bar-row__name">' + row.name + (row.amount === 0 ? ' <span class="bar-row__note">(зөвхөн зарлага)</span>' : '') + '</span>' +
+          '<span class="bar-row__value' + (row.amount === 0 ? ' muted' : '') + '">' + fmt(row.amount) + ' ' + unit + '</span>' +
+        '</div>' +
+        '<div class="bar-track" tabindex="0"><div class="bar-fill" style="width:' + pct + '%"></div></div>';
+      var track = rowEl.querySelector(".bar-track");
+      var share = ((row.amount / total) * 100).toFixed(1) + "%";
+      function show() {
+        var panelRect = wrap.parentElement.getBoundingClientRect();
+        var r = track.getBoundingClientRect();
+        tip.innerHTML = "Нийлүүлсэн: <b>" + fmt(row.amount) + " " + unit + "</b> · нийт орлогын " + share;
+        tip.style.left = (r.left - panelRect.left + r.width / 2) + "px";
+        tip.style.top = (r.top - panelRect.top) + "px";
+        tip.classList.add("is-visible");
+      }
+      function hide() { tip.classList.remove("is-visible"); }
+      track.addEventListener("mouseenter", show);
+      track.addEventListener("focus", show);
+      track.addEventListener("mouseleave", hide);
+      track.addEventListener("blur", hide);
+      wrap.appendChild(rowEl);
+    });
+  }
+
+  function renderTable(derived, unit) {
+    var body = document.getElementById("txnBody");
+    body.innerHTML = "";
+    derived.points.slice().reverse().forEach(function (p) {
+      var tr = document.createElement("tr");
+      var isIn = p.type === "Орлого";
+      tr.innerHTML =
+        "<td>" + p.date + "</td>" +
+        "<td>" + p.company + "</td>" +
+        '<td><span class="pill ' + (isIn ? "pill--in" : "pill--out") + '">' + p.type + "</span></td>" +
+        '<td class="num">' + fmt(p.amount) + " " + unit + "</td>" +
+        '<td class="num ' + (isIn ? "delta--in" : "delta--out") + '">' + (isIn ? "+" : "−") + fmt(p.amount) + "</td>" +
+        '<td class="num">' + fmt(p.balance) + "</td>";
+      body.appendChild(tr);
+    });
+  }
+
+  function populateCompanySelect(data) {
+    var sel = document.getElementById("fCompany");
+    sel.innerHTML = "";
+    (data.companies || []).forEach(function (c) {
+      var opt = document.createElement("option");
+      opt.value = c; opt.textContent = c;
+      sel.appendChild(opt);
+    });
+    var optNew = document.createElement("option");
+    optNew.value = "__new__"; optNew.textContent = "+ Шинэ компани…";
+    sel.appendChild(optNew);
+  }
+
+  function render(data) {
+    state.data = data;
+    var derived = computeDerived(data);
+    renderKpis(derived, data);
+    renderTrend(derived);
+    renderBars(derived, data.unit);
+    renderTable(derived, data.unit);
+    populateCompanySelect(data);
+  }
+
+  function loadData(bust) {
+    var url = "./data.json" + (bust ? "?t=" + Date.now() : "");
+    return fetch(url, { cache: "no-store" }).then(function (r) {
+      if (!r.ok) throw new Error("data.json уншиж чадсангүй (" + r.status + ")");
+      return r.json();
+    });
+  }
+
+  loadData(false).then(render).catch(function (err) {
+    document.getElementById("companyName").textContent = "Өгөгдөл ачаалахад алдаа гарлаа";
+    document.getElementById("companySubtitle").textContent = err.message;
+  });
+
+  // ---------- Admin ----------
+  var adminToggle = document.getElementById("adminToggle");
+  var adminPanel = document.getElementById("adminPanel");
+  adminToggle.addEventListener("click", function () {
+    adminPanel.classList.toggle("is-open");
+  });
+
+  var tokenInput = document.getElementById("tokenInput");
+  var TOKEN_KEY = "himiinBodisGithubToken";
+  var savedToken = localStorage.getItem(TOKEN_KEY);
+  if (savedToken) tokenInput.value = savedToken;
+
+  document.getElementById("tokenSaveBtn").addEventListener("click", function () {
+    localStorage.setItem(TOKEN_KEY, tokenInput.value.trim());
+    setStatus("Token хадгалагдлаа (энэ browser-т л).", "ok");
+  });
+  document.getElementById("tokenClearBtn").addEventListener("click", function () {
+    localStorage.removeItem(TOKEN_KEY);
+    tokenInput.value = "";
+    setStatus("Token устгагдлаа.", "ok");
+  });
+
+  document.getElementById("fCompany").addEventListener("change", function () {
+    document.getElementById("newCompanyField").style.display = this.value === "__new__" ? "block" : "none";
+  });
+
+  function setStatus(msg, kind) {
+    var el = document.getElementById("statusMsg");
+    el.className = "status-msg is-" + kind;
+    el.textContent = msg;
+  }
+
+  function b64EncodeUtf8(str) {
+    return btoa(unescape(encodeURIComponent(str)));
+  }
+  function b64DecodeUtf8(str) {
+    return decodeURIComponent(escape(atob(str)));
+  }
+
+  document.getElementById("addForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var token = localStorage.getItem(TOKEN_KEY);
+    if (!token) { setStatus("Эхлээд GitHub token-оо оруулж хадгална уу.", "error"); return; }
+
+    var dateRaw = document.getElementById("fDate").value; // yyyy-mm-dd
+    if (!dateRaw) { setStatus("Огноо сонгоно уу.", "error"); return; }
+    var date = dateRaw.replace(/-/g, ".");
+    var type = document.getElementById("fType").value;
+    var companySel = document.getElementById("fCompany").value;
+    var company = companySel === "__new__" ? document.getElementById("fNewCompany").value.trim() : companySel;
+    var amount = parseFloat(document.getElementById("fAmount").value);
+
+    if (!company) { setStatus("Компанийн нэр хоосон байна.", "error"); return; }
+    if (!amount || amount <= 0) { setStatus("Тоо хэмжээ буруу байна.", "error"); return; }
+
+    var submitBtn = document.getElementById("submitBtn");
+    submitBtn.disabled = true;
+    setStatus("GitHub руу илгээж байна…", "busy");
+
+    var apiBase = "https://api.github.com/repos/" + CONFIG.owner + "/" + CONFIG.repo + "/contents/" + CONFIG.path;
+
+    fetch(apiBase + "?ref=" + CONFIG.branch, {
+      headers: { "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json" }
+    }).then(function (r) {
+      if (!r.ok) throw new Error("Одоогийн файлыг уншиж чадсангүй (HTTP " + r.status + "). Token эсвэл эрхээ шалгана уу.");
+      return r.json();
+    }).then(function (fileInfo) {
+      var current = JSON.parse(b64DecodeUtf8(fileInfo.content));
+      current.transactions.push({ date: date, type: type, company: company, amount: amount });
+      if (current.companies.indexOf(company) === -1) current.companies.push(company);
+      var today = new Date();
+      current.lastUpdated = today.getFullYear() + "." + String(today.getMonth() + 1).padStart(2, "0") + "." + String(today.getDate()).padStart(2, "0");
+
+      var newContent = JSON.stringify(current, null, 2);
+      return fetch(apiBase, {
+        method: "PUT",
+        headers: { "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json", "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: "Гүйлгээ нэмэв: " + date + " " + type + " " + company + " " + amount + current.unit,
+          content: b64EncodeUtf8(newContent),
+          sha: fileInfo.sha,
+          branch: CONFIG.branch
+        })
+      });
+    }).then(function (r) {
+      if (!r.ok) return r.json().then(function (j) { throw new Error("Commit амжилтгүй (HTTP " + r.status + "): " + (j.message || "")); });
+      setStatus("Амжилттай! GitHub дээр commit хийгдлээ. Хуудас удахгүй шинэчлэгдэнэ.", "ok");
+      document.getElementById("addForm").reset();
+      document.getElementById("newCompanyField").style.display = "none";
+      return loadData(true).then(render);
+    }).catch(function (err) {
+      setStatus(err.message, "error");
+    }).finally(function () {
+      submitBtn.disabled = false;
+    });
+  });
+})();
+</script>
+</body>
+</html>
