@@ -149,10 +149,18 @@
 
   .action-col { display: none; width: 1%; white-space: nowrap; }
   body.admin-mode .action-col { display: table-cell; }
-  .del-btn { font: inherit; font-size: 12px; font-weight: 700; color: var(--bad); background: var(--bad-soft);
+  .row-actions { display: flex; gap: 6px; justify-content: flex-end; }
+  .del-btn, .edit-btn { font: inherit; font-size: 12px; font-weight: 700;
     border: 1px solid transparent; border-radius: 7px; padding: 5px 10px; cursor: pointer; }
-  .del-btn:hover { filter: brightness(0.95); }
-  .del-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .del-btn { color: var(--bad); background: var(--bad-soft); }
+  .edit-btn { color: var(--copper-ink); background: var(--copper-soft); }
+  .del-btn:hover, .edit-btn:hover { filter: brightness(0.95); }
+  .del-btn:disabled, .edit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .form-actions .btn--ghost.is-editing-cancel { display: none; }
+  .admin-panel.is-editing .form-actions .btn--ghost.is-editing-cancel { display: inline-flex; }
+  .editing-banner { display: none; font-size: 12.5px; background: var(--copper-soft); color: var(--copper-ink);
+    padding: 8px 10px; border-radius: 8px; }
+  .admin-panel.is-editing .editing-banner { display: block; }
 
   @media (max-width: 760px) {
     .kpis { grid-template-columns: repeat(2, 1fr); }
@@ -271,6 +279,7 @@
     </details>
 
     <form id="addForm">
+      <div class="editing-banner" id="editingBanner">Гүйлгээ засаж байна…</div>
       <div class="form-row">
         <div class="field">
           <label for="fDate">Огноо</label>
@@ -298,6 +307,7 @@
       </div>
       <div class="form-actions" style="margin-top:12px;">
         <button class="btn btn--primary" id="submitBtn" type="submit">Мөр нэмж, GitHub-д commit хийх</button>
+        <button class="btn btn--ghost is-editing-cancel" id="cancelEditBtn" type="button">Цуцлах</button>
         <span class="footnote">Commit хийгдсэний дараа сайт 1 минут орчимд шинэчлэгдэж болно.</span>
       </div>
     </form>
@@ -315,7 +325,7 @@
     path: "data.json"
   };
 
-  var state = { data: null };
+  var state = { data: null, editIndex: null, editSnapshot: null };
 
   function fmt(n) {
     return (Math.round(n * 100) / 100).toFixed(2);
@@ -487,7 +497,10 @@
         '<td class="num">' + fmt(p.amount) + " " + unit + "</td>" +
         '<td class="num ' + (isIn ? "delta--in" : "delta--out") + '">' + (isIn ? "+" : "−") + fmt(p.amount) + "</td>" +
         '<td class="num">' + fmt(p.balance) + "</td>" +
-        '<td class="num action-col"><button type="button" class="del-btn" data-idx="' + idx + '">Устгах</button></td>';
+        '<td class="num action-col"><div class="row-actions">' +
+          '<button type="button" class="edit-btn" data-idx="' + idx + '">Засах</button>' +
+          '<button type="button" class="del-btn" data-idx="' + idx + '">Устгах</button>' +
+        '</div></td>';
       body.appendChild(tr);
     });
 
@@ -498,6 +511,12 @@
         if (!t) return;
         var ok = confirm("Устгах уу?\n\n" + t.date + " · " + t.company + " · " + t.type + " · " + fmt(t.amount) + " " + state.data.unit);
         if (ok) deleteTransaction(idx, t, btn);
+      });
+    });
+    body.querySelectorAll(".edit-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var idx = parseInt(btn.dataset.idx, 10);
+        startEdit(idx);
       });
     });
   }
@@ -578,6 +597,91 @@
     return decodeURIComponent(escape(atob(str)));
   }
 
+  function startEdit(idx) {
+    var t = state.data.transactions[idx];
+    if (!t) return;
+
+    if (!adminPanel.classList.contains("is-open")) {
+      adminPanel.classList.add("is-open");
+      document.body.classList.add("admin-mode");
+    }
+
+    document.getElementById("fDate").value = t.date.replace(/\./g, "-");
+    document.getElementById("fType").value = t.type;
+    var companySel = document.getElementById("fCompany");
+    if (Array.prototype.some.call(companySel.options, function (o) { return o.value === t.company; })) {
+      companySel.value = t.company;
+    }
+    document.getElementById("newCompanyField").style.display = "none";
+    document.getElementById("fAmount").value = t.amount;
+
+    state.editIndex = idx;
+    state.editSnapshot = { date: t.date, type: t.type, company: t.company, amount: t.amount };
+
+    adminPanel.classList.add("is-editing");
+    document.getElementById("submitBtn").textContent = "Мөр засах, GitHub-д commit хийх";
+    document.getElementById("statusMsg").className = "status-msg";
+    adminPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function cancelEdit() {
+    state.editIndex = null;
+    state.editSnapshot = null;
+    adminPanel.classList.remove("is-editing");
+    document.getElementById("submitBtn").textContent = "Мөр нэмж, GitHub-д commit хийх";
+    document.getElementById("addForm").reset();
+    document.getElementById("newCompanyField").style.display = "none";
+  }
+
+  document.getElementById("cancelEditBtn").addEventListener("click", cancelEdit);
+
+  function updateTransaction(idx, expected, updated, btn) {
+    var token = localStorage.getItem(TOKEN_KEY);
+    if (!token) { setStatus("Эхлээд GitHub token-оо оруулж хадгална уу.", "error"); return; }
+
+    if (btn) btn.disabled = true;
+    setStatus("GitHub руу илгээж байна…", "busy");
+    var apiBase = apiBaseUrl();
+
+    fetch(apiBase + "?ref=" + CONFIG.branch, {
+      headers: { "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json" }
+    }).then(function (r) {
+      if (!r.ok) throw new Error("Одоогийн файлыг уншиж чадсангүй (HTTP " + r.status + "). Token эсвэл эрхээ шалгана уу.");
+      return r.json();
+    }).then(function (fileInfo) {
+      var current = JSON.parse(b64DecodeUtf8(fileInfo.content));
+      var t = current.transactions[idx];
+      if (!t || t.date !== expected.date || t.type !== expected.type || t.company !== expected.company || t.amount !== expected.amount) {
+        throw new Error("Файл өөр хэн нэгнээр өөрчлөгдсөн байна. Хуудсыг дахин ачаалж (F5), дахин оролдоно уу.");
+      }
+      current.transactions[idx] = { date: updated.date, type: updated.type, company: updated.company, amount: updated.amount };
+      if (current.companies.indexOf(updated.company) === -1) current.companies.push(updated.company);
+      var today = new Date();
+      current.lastUpdated = today.getFullYear() + "." + String(today.getMonth() + 1).padStart(2, "0") + "." + String(today.getDate()).padStart(2, "0");
+
+      var newContent = JSON.stringify(current, null, 2);
+      return fetch(apiBase, {
+        method: "PUT",
+        headers: { "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json", "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: "Гүйлгээ засав: " + expected.date + " → " + updated.date + " " + updated.type + " " + updated.company + " " + updated.amount + current.unit,
+          content: b64EncodeUtf8(newContent),
+          sha: fileInfo.sha,
+          branch: CONFIG.branch
+        })
+      });
+    }).then(function (r) {
+      if (!r.ok) return r.json().then(function (j) { throw new Error("Commit амжилтгүй (HTTP " + r.status + "): " + (j.message || "")); });
+      setStatus("Амжилттай засагдлаа! Хуудас удахгүй шинэчлэгдэнэ.", "ok");
+      cancelEdit();
+      return loadData(true).then(render);
+    }).catch(function (err) {
+      setStatus(err.message, "error");
+    }).finally(function () {
+      if (btn) btn.disabled = false;
+    });
+  }
+
   function apiBaseUrl() {
     return "https://api.github.com/repos/" + CONFIG.owner + "/" + CONFIG.repo + "/contents/" + CONFIG.path;
   }
@@ -643,6 +747,12 @@
     if (!amount || amount <= 0) { setStatus("Тоо хэмжээ буруу байна.", "error"); return; }
 
     var submitBtn = document.getElementById("submitBtn");
+
+    if (state.editIndex !== null) {
+      updateTransaction(state.editIndex, state.editSnapshot, { date: date, type: type, company: company, amount: amount }, submitBtn);
+      return;
+    }
+
     submitBtn.disabled = true;
     setStatus("GitHub руу илгээж байна…", "busy");
 
