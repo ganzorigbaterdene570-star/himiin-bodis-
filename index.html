@@ -455,11 +455,15 @@
     var expense = txns.filter(function (t) { return t.type === "Зарлага"; }).reduce(function (s, t) { return s + t.amount; }, 0);
 
     var byCompany = {};
+    var companiesWithTxns = {};
     (data.companies || []).forEach(function (c) { byCompany[c] = 0; });
     txns.forEach(function (t) {
+      companiesWithTxns[t.company] = true;
       if (t.type === "Орлого") byCompany[t.company] = (byCompany[t.company] || 0) + t.amount;
     });
-    var companyRows = Object.keys(byCompany).map(function (name) {
+    var companyRows = Object.keys(byCompany).filter(function (name) {
+      return companiesWithTxns[name];
+    }).map(function (name) {
       return { name: name, amount: byCompany[name] };
     }).sort(function (a, b) { return b.amount - a.amount; });
 
