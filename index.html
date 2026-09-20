@@ -433,6 +433,10 @@
           <input type="number" id="oUnitPrice" step="0.01" min="0" />
         </div>
       </div>
+      <div class="field" id="newOrderCompanyField" style="display:none; margin-top:10px;">
+        <label for="oNewCompany">Шинэ компанийн нэр</label>
+        <input type="text" id="oNewCompany" placeholder="Жишээ: Шинэ ХХК" />
+      </div>
       <div class="form-actions" style="margin-top:12px;">
         <button class="btn btn--primary" id="orderSubmitBtn" type="submit">Захиалга нэмж, GitHub-д commit хийх</button>
       </div>
@@ -851,6 +855,9 @@
       opt.value = c; opt.textContent = c;
       sel.appendChild(opt);
     });
+    var optNew = document.createElement("option");
+    optNew.value = "__new__"; optNew.textContent = "+ Шинэ компани…";
+    sel.appendChild(optNew);
     if (prev && Array.prototype.some.call(sel.options, function (o) { return o.value === prev; })) sel.value = prev;
   }
 
@@ -942,6 +949,9 @@
   });
   document.getElementById("fSubstance").addEventListener("change", function () {
     document.getElementById("newSubstanceField").style.display = this.value === "__new__" ? "block" : "none";
+  });
+  document.getElementById("oCompany").addEventListener("change", function () {
+    document.getElementById("newOrderCompanyField").style.display = this.value === "__new__" ? "block" : "none";
   });
 
   function setStatus(msg, kind) {
@@ -1159,7 +1169,8 @@
     if (!dateRaw) { setOrderStatus("Огноо сонгоно уу.", "error"); return; }
     var date = dateRaw.replace(/-/g, ".");
     var substance = document.getElementById("oSubstance").value;
-    var company = document.getElementById("oCompany").value;
+    var companySel = document.getElementById("oCompany").value;
+    var company = companySel === "__new__" ? document.getElementById("oNewCompany").value.trim() : companySel;
     var amount = parseFloat(document.getElementById("oAmount").value);
     var unitPriceRaw = document.getElementById("oUnitPrice").value;
     var unitPrice = unitPriceRaw ? parseFloat(unitPriceRaw) : null;
@@ -1183,6 +1194,7 @@
       var current = JSON.parse(b64DecodeUtf8(fileInfo.content));
       if (!current.orders) current.orders = [];
       current.orders.push({ date: date, company: company, substance: substance, amount: amount, unitPrice: unitPrice });
+      if (current.companies.indexOf(company) === -1) current.companies.push(company);
       var today = new Date();
       current.lastUpdated = today.getFullYear() + "." + String(today.getMonth() + 1).padStart(2, "0") + "." + String(today.getDate()).padStart(2, "0");
 
@@ -1202,6 +1214,7 @@
       setOrderStatus("Амжилттай! GitHub дээр commit хийгдлээ. Хуудас удахгүй шинэчлэгдэнэ.", "ok");
       state.selectedSubstance = substance;
       document.getElementById("orderForm").reset();
+      document.getElementById("newOrderCompanyField").style.display = "none";
       return loadData(true).then(render);
     }).catch(function (err) {
       setOrderStatus(err.message, "error");
