@@ -240,12 +240,14 @@
   "orders": [
     {
       "date": "2026.09.20",
+      "company": "Цэцүүх ХХК",
       "substance": "Хүхрийн хүчил",
       "amount": 1020,
       "unitPrice": 3410000
     },
     {
       "date": "2026.09.20",
+      "company": "Цэцүүх ХХК",
       "substance": "Хүхрийн хүчил",
       "amount": 540,
       "unitPrice": 3410000

@@ -102,10 +102,12 @@
     border: 1px solid var(--border); overflow: hidden; cursor: pointer; }
   .bar-fill { position: absolute; inset: 0 auto 0 0; border-radius: 6px; background: linear-gradient(90deg, var(--copper-soft-strong), var(--copper)); }
 
+  .order-companies { display: flex; flex-direction: column; gap: 16px; }
+  .order-company-block { display: flex; flex-direction: column; gap: 6px; }
   .order-stats { display: flex; flex-wrap: wrap; gap: 22px; }
   .order-stat { display: flex; flex-direction: column; gap: 4px; min-width: 130px; }
   .order-stat__label { font-size: 11.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400); }
-  .order-stat__value { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+  .order-stat__value { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
   .order-stat__value.is-over { color: var(--bad); }
   .order-fill--good { background: linear-gradient(90deg, var(--good-soft), var(--good)); }
   .order-empty { font-size: 13px; color: var(--ink-400); }
@@ -271,19 +273,12 @@
       <span class="panel__title">Захиалга ба гүйцэтгэл</span>
       <span class="panel__hint" id="orderHint">Захиалсан хэмжээнээс хэдэн хувь нь ирсэн бэ</span>
     </div>
-    <div class="order-stats" id="orderStats"></div>
-    <div class="bar-row" id="orderProgressRow" style="margin-top:2px;">
-      <div class="bar-row__top">
-        <span class="bar-row__name">Гүйцэтгэл</span>
-        <span class="bar-row__value" id="orderPercentLabel">—</span>
-      </div>
-      <div class="bar-track"><div class="bar-fill order-fill--good" id="orderProgressFill" style="width:0%"></div></div>
-    </div>
+    <div class="order-companies" id="orderCompanies"></div>
     <div class="table-wrap" id="orderTableWrap" style="margin-top:6px;">
       <table>
         <thead>
           <tr>
-            <th>Огноо</th><th class="num">Захиалсан</th><th class="num">Нэгж үнэ</th><th class="num">Нийт үнэ</th>
+            <th>Огноо</th><th>Компани</th><th class="num">Захиалсан</th><th class="num">Нэгж үнэ</th><th class="num">Нийт үнэ</th>
             <th class="num action-col">Үйлдэл</th>
           </tr>
         </thead>
@@ -416,7 +411,7 @@
       <span class="panel__hint">Захиалсан тоо хэмжээ, үнийг бүртгэнэ</span>
     </div>
     <form id="orderForm">
-      <div class="form-row" style="grid-template-columns: repeat(4, 1fr);">
+      <div class="form-row" style="grid-template-columns: repeat(5, 1fr);">
         <div class="field">
           <label for="oDate">Огноо</label>
           <input type="date" id="oDate" required />
@@ -424,6 +419,10 @@
         <div class="field">
           <label for="oSubstance">Бодис</label>
           <select id="oSubstance" required></select>
+        </div>
+        <div class="field">
+          <label for="oCompany">Компани (хэнд захиалсан)</label>
+          <select id="oCompany" required></select>
         </div>
         <div class="field">
           <label for="oAmount">Захиалсан тоо хэмжээ</label>
@@ -539,13 +538,33 @@
     return Math.round(n).toLocaleString("mn-MN");
   }
 
-  function computeOrderStats(data, substanceName, income) {
+  function computeOrderStats(data, substanceName, companyRows) {
     var orders = (data.orders || []).filter(function (o) { return o.substance === substanceName; })
       .slice().sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
-    var totalOrdered = orders.reduce(function (s, o) { return s + o.amount; }, 0);
-    var pending = totalOrdered - income;
-    var percent = totalOrdered > 0 ? Math.min(999, (income / totalOrdered) * 100) : 0;
-    return { orders: orders, totalOrdered: totalOrdered, received: income, pending: pending, percent: percent };
+
+    var receivedByCompany = {};
+    (companyRows || []).forEach(function (r) { receivedByCompany[r.name] = r.amount; });
+
+    var groupsByCompany = {};
+    var order = [];
+    orders.forEach(function (o) {
+      if (!groupsByCompany[o.company]) {
+        groupsByCompany[o.company] = { company: o.company, totalOrdered: 0, orders: [] };
+        order.push(o.company);
+      }
+      groupsByCompany[o.company].totalOrdered += o.amount;
+      groupsByCompany[o.company].orders.push(o);
+    });
+
+    var groups = order.map(function (name) {
+      var g = groupsByCompany[name];
+      var received = receivedByCompany[name] || 0;
+      var pending = g.totalOrdered - received;
+      var percent = g.totalOrdered > 0 ? Math.min(999, (received / g.totalOrdered) * 100) : 0;
+      return { company: g.company, totalOrdered: g.totalOrdered, received: received, pending: pending, percent: percent, orders: g.orders };
+    });
+
+    return { orders: orders, groups: groups };
   }
 
   function renderKpis(derived, data, substanceName, unit) {
@@ -723,26 +742,35 @@
   }
 
   function renderOrders(orderStats, unit, originalOrders) {
-    var statsWrap = document.getElementById("orderStats");
-    var pendingIsOver = orderStats.pending < 0;
-    statsWrap.innerHTML =
-      '<div class="order-stat"><span class="order-stat__label">Захиалсан</span>' +
-        '<span class="order-stat__value">' + fmt(orderStats.totalOrdered) + " " + unit + '</span></div>' +
-      '<div class="order-stat"><span class="order-stat__label">Ирсэн</span>' +
-        '<span class="order-stat__value">' + fmt(orderStats.received) + " " + unit + '</span></div>' +
-      '<div class="order-stat"><span class="order-stat__label">' + (pendingIsOver ? "Илүү ирсэн" : "Хүлээгдэж буй") + '</span>' +
-        '<span class="order-stat__value' + (pendingIsOver ? " is-over" : "") + '">' + fmt(Math.abs(orderStats.pending)) + " " + unit + '</span></div>';
-
-    var pct = Math.max(0, Math.min(100, orderStats.percent));
-    document.getElementById("orderProgressFill").style.width = pct + "%";
-    document.getElementById("orderPercentLabel").textContent = orderStats.totalOrdered > 0
-      ? orderStats.percent.toFixed(1) + "%"
-      : "Захиалга алга";
+    var wrap = document.getElementById("orderCompanies");
+    wrap.innerHTML = "";
+    if (!orderStats.groups.length) {
+      wrap.innerHTML = '<p class="order-empty">Энэ бодист захиалга бүртгэгдээгүй байна.</p>';
+    }
+    orderStats.groups.forEach(function (g) {
+      var pendingIsOver = g.pending < 0;
+      var pct = Math.max(0, Math.min(100, g.percent));
+      var block = document.createElement("div");
+      block.className = "order-company-block";
+      block.innerHTML =
+        '<div class="bar-row__top">' +
+          '<span class="bar-row__name">' + g.company + '</span>' +
+          '<span class="bar-row__value">' + (g.totalOrdered > 0 ? g.percent.toFixed(1) + "%" : "—") + '</span>' +
+        '</div>' +
+        '<div class="bar-track"><div class="bar-fill order-fill--good" style="width:' + pct + '%"></div></div>' +
+        '<div class="order-stats">' +
+          '<div class="order-stat"><span class="order-stat__label">Захиалсан</span><span class="order-stat__value">' + fmt(g.totalOrdered) + " " + unit + '</span></div>' +
+          '<div class="order-stat"><span class="order-stat__label">Ирсэн</span><span class="order-stat__value">' + fmt(g.received) + " " + unit + '</span></div>' +
+          '<div class="order-stat"><span class="order-stat__label">' + (pendingIsOver ? "Илүү ирсэн" : "Хүлээгдэж буй") + '</span>' +
+            '<span class="order-stat__value' + (pendingIsOver ? " is-over" : "") + '">' + fmt(Math.abs(g.pending)) + " " + unit + '</span></div>' +
+        '</div>';
+      wrap.appendChild(block);
+    });
 
     var body = document.getElementById("orderBody");
     body.innerHTML = "";
     if (!orderStats.orders.length) {
-      body.innerHTML = '<tr><td colspan="5" class="order-empty">Энэ бодист захиалга бүртгэгдээгүй байна.</td></tr>';
+      body.innerHTML = '<tr><td colspan="6" class="order-empty">Энэ бодист захиалга бүртгэгдээгүй байна.</td></tr>';
       return;
     }
     orderStats.orders.slice().reverse().forEach(function (o) {
@@ -751,6 +779,7 @@
       var tr = document.createElement("tr");
       tr.innerHTML =
         "<td>" + o.date + "</td>" +
+        "<td>" + o.company + "</td>" +
         '<td class="num">' + fmt(o.amount) + " " + unit + "</td>" +
         '<td class="num">' + (o.unitPrice ? fmtMoney(o.unitPrice) + "₮" : "—") + "</td>" +
         '<td class="num">' + (totalPrice !== null ? fmtMoney(totalPrice) + "₮" : "—") + "</td>" +
@@ -765,7 +794,7 @@
         var idx = parseInt(btn.dataset.idx, 10);
         var o = state.data.orders[idx];
         if (!o) return;
-        var ok = confirm("Захиалгыг устгах уу?\n\n" + o.date + " · " + fmt(o.amount) + " " + unitFor(state.data, o.substance) + " · " + o.substance);
+        var ok = confirm("Захиалгыг устгах уу?\n\n" + o.date + " · " + o.company + " · " + fmt(o.amount) + " " + unitFor(state.data, o.substance) + " · " + o.substance);
         if (ok) deleteOrder(idx, o, btn);
       });
     });
@@ -813,6 +842,18 @@
     if (prev && Array.prototype.some.call(sel.options, function (o) { return o.value === prev; })) sel.value = prev;
   }
 
+  function populateOrderCompanySelect(data) {
+    var sel = document.getElementById("oCompany");
+    var prev = sel.value;
+    sel.innerHTML = "";
+    (data.companies || []).forEach(function (c) {
+      var opt = document.createElement("option");
+      opt.value = c; opt.textContent = c;
+      sel.appendChild(opt);
+    });
+    if (prev && Array.prototype.some.call(sel.options, function (o) { return o.value === prev; })) sel.value = prev;
+  }
+
   function renderSubstanceTabs(data) {
     var wrap = document.getElementById("substanceTabs");
     wrap.innerHTML = "";
@@ -838,7 +879,7 @@
     var unit = unitFor(data, state.selectedSubstance);
     var derived = computeDerived(data, state.selectedSubstance);
 
-    var orderStats = computeOrderStats(data, state.selectedSubstance, derived.income);
+    var orderStats = computeOrderStats(data, state.selectedSubstance, derived.companyRows);
 
     renderSubstanceTabs(data);
     renderKpis(derived, data, state.selectedSubstance, unit);
@@ -849,6 +890,7 @@
     populateCompanySelect(data);
     populateSubstanceSelect(data);
     populateOrderSubstanceSelect(data);
+    populateOrderCompanySelect(data);
 
     document.getElementById("trendHint").textContent = "Гүйлгээ тус бүрийн дараах үлдэгдэл, " + unit;
     document.getElementById("barsHint").textContent = "Компани тус бүр, " + unit;
@@ -1080,7 +1122,7 @@
     }).then(function (fileInfo) {
       var current = JSON.parse(b64DecodeUtf8(fileInfo.content));
       var o = (current.orders || [])[idx];
-      if (!o || o.date !== expected.date || o.substance !== expected.substance || o.amount !== expected.amount) {
+      if (!o || o.date !== expected.date || o.company !== expected.company || o.substance !== expected.substance || o.amount !== expected.amount) {
         throw new Error("Файл өөр хэн нэгнээр өөрчлөгдсөн байна. Хуудсыг дахин ачаалж (F5), дахин оролдоно уу.");
       }
       current.orders.splice(idx, 1);
@@ -1092,7 +1134,7 @@
         method: "PUT",
         headers: { "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json", "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: "Захиалга устгав: " + o.date + " " + o.substance + " " + o.amount,
+          message: "Захиалга устгав: " + o.date + " " + o.company + " " + o.substance + " " + o.amount,
           content: b64EncodeUtf8(newContent),
           sha: fileInfo.sha,
           branch: CONFIG.branch
@@ -1117,11 +1159,13 @@
     if (!dateRaw) { setOrderStatus("Огноо сонгоно уу.", "error"); return; }
     var date = dateRaw.replace(/-/g, ".");
     var substance = document.getElementById("oSubstance").value;
+    var company = document.getElementById("oCompany").value;
     var amount = parseFloat(document.getElementById("oAmount").value);
     var unitPriceRaw = document.getElementById("oUnitPrice").value;
     var unitPrice = unitPriceRaw ? parseFloat(unitPriceRaw) : null;
 
     if (!substance) { setOrderStatus("Бодис сонгоно уу.", "error"); return; }
+    if (!company) { setOrderStatus("Компани сонгоно уу.", "error"); return; }
     if (!amount || amount <= 0) { setOrderStatus("Тоо хэмжээ буруу байна.", "error"); return; }
 
     var submitBtn = document.getElementById("orderSubmitBtn");
@@ -1138,7 +1182,7 @@
     }).then(function (fileInfo) {
       var current = JSON.parse(b64DecodeUtf8(fileInfo.content));
       if (!current.orders) current.orders = [];
-      current.orders.push({ date: date, substance: substance, amount: amount, unitPrice: unitPrice });
+      current.orders.push({ date: date, company: company, substance: substance, amount: amount, unitPrice: unitPrice });
       var today = new Date();
       current.lastUpdated = today.getFullYear() + "." + String(today.getMonth() + 1).padStart(2, "0") + "." + String(today.getDate()).padStart(2, "0");
 
@@ -1147,7 +1191,7 @@
         method: "PUT",
         headers: { "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json", "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: "Захиалга нэмэв: " + date + " " + substance + " " + amount,
+          message: "Захиалга нэмэв: " + date + " " + company + " " + substance + " " + amount,
           content: b64EncodeUtf8(newContent),
           sha: fileInfo.sha,
           branch: CONFIG.branch
