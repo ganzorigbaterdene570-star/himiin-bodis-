@@ -293,6 +293,13 @@
       "substance": "Натрийн Гидроксид",
       "amount": 3200,
       "unitPrice": 6200
+    },
+    {
+      "date": "2026.07.09",
+      "company": "Цэцүүх ХХК",
+      "substance": "Аммиак усан уусмал",
+      "amount": 23400,
+      "unitPrice": 9800
     }
   ]
 }
