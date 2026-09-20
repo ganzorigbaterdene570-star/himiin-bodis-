@@ -191,6 +191,9 @@
   .top-actions { display: flex; gap: 8px; align-self: flex-start; }
 
   /* ---------- Substance tabs ---------- */
+  .substance-search-wrap { display: flex; }
+  .substance-search { font: inherit; width: 100%; max-width: 320px; padding: 9px 14px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--surface-raised); color: var(--ink-900); }
   .substance-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
   .substance-tab { font: inherit; font-size: 13px; font-weight: 700; padding: 8px 14px; border-radius: 999px;
     border: 1px solid var(--border); background: var(--surface-raised); color: var(--ink-600); cursor: pointer; }
@@ -252,6 +255,9 @@
     </div>
   </header>
 
+  <div class="substance-search-wrap">
+    <input type="text" id="substanceSearch" class="substance-search" placeholder="Бодис хайх…" autocomplete="off" />
+  </div>
   <div class="substance-tabs" id="substanceTabs"></div>
 
   <section class="kpis" id="kpis">
@@ -920,7 +926,15 @@
   function renderSubstanceTabs(data) {
     var wrap = document.getElementById("substanceTabs");
     wrap.innerHTML = "";
-    (data.substances || []).forEach(function (s) {
+    var query = (document.getElementById("substanceSearch").value || "").trim().toLowerCase();
+    var list = (data.substances || []).filter(function (s) {
+      return !query || s.name.toLowerCase().indexOf(query) !== -1;
+    });
+    if (!list.length) {
+      wrap.innerHTML = '<span class="order-empty">Илэрц олдсонгүй.</span>';
+      return;
+    }
+    list.forEach(function (s) {
       var btn = document.createElement("button");
       btn.type = "button";
       btn.className = "substance-tab" + (s.name === state.selectedSubstance ? " is-active" : "");
@@ -932,6 +946,10 @@
       wrap.appendChild(btn);
     });
   }
+
+  document.getElementById("substanceSearch").addEventListener("input", function () {
+    if (state.data) renderSubstanceTabs(state.data);
+  });
 
   function renderCurrent() {
     var data = state.data;
