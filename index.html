@@ -198,6 +198,16 @@
   .substance-disclosure__chevron { margin-left: auto; color: var(--ink-600); font-size: 20px; line-height: 1; transition: transform 0.15s ease; }
   .substance-disclosure[open] .substance-disclosure__chevron { transform: rotate(180deg); }
   .substance-disclosure .substance-tabs { margin-top: 10px; }
+
+  .fulfillment-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 12px; }
+  .fulfillment-col__title { font-size: 12px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-400); margin-bottom: 8px; }
+  .fulfillment-company { margin-bottom: 12px; }
+  .fulfillment-company__name { font-size: 13px; font-weight: 700; margin-bottom: 3px; }
+  .fulfillment-item { font-size: 12.5px; color: var(--ink-600); padding-left: 2px; display: flex; justify-content: space-between; gap: 10px; }
+  .fulfillment-item b { font-variant-numeric: tabular-nums; color: var(--ink-900); }
+  @media (max-width: 760px) {
+    .fulfillment-columns { grid-template-columns: 1fr; }
+  }
   .substance-search-wrap { display: flex; }
   .substance-search { font: inherit; width: 100%; max-width: 320px; padding: 9px 14px; border-radius: 999px;
     border: 1px solid var(--border); background: var(--surface-raised); color: var(--ink-900); }
@@ -314,6 +324,15 @@
       </table>
     </div>
   </section>
+
+  <details class="substance-disclosure" id="fulfillmentDisclosure" open>
+    <summary>
+      <span>Захиалгын гүйцэтгэл</span>
+      <span class="substance-disclosure__current">Бүх бодис, компаниар</span>
+      <span class="substance-disclosure__chevron" aria-hidden="true">▾</span>
+    </summary>
+    <div class="fulfillment-columns" id="fulfillmentColumns"></div>
+  </details>
 
   <section class="grid-2">
     <div class="panel">
@@ -995,9 +1014,72 @@
     document.getElementById("barsHint").textContent = "Компани тус бүр, " + unit;
   }
 
+  function computeGlobalFulfillment(data) {
+    var groups = {};
+    var order = [];
+    (data.orders || []).forEach(function (o) {
+      var key = o.company + "||" + o.substance;
+      if (!groups[key]) { groups[key] = { company: o.company, substance: o.substance, totalOrdered: 0 }; order.push(key); }
+      groups[key].totalOrdered += o.amount;
+    });
+
+    var received = {};
+    (data.transactions || []).forEach(function (t) {
+      if (t.type !== "Орлого") return;
+      var key = t.company + "||" + t.substance;
+      received[key] = (received[key] || 0) + t.amount;
+    });
+
+    var completed = [], pending = [];
+    order.forEach(function (key) {
+      var g = groups[key];
+      var rec = received[key] || 0;
+      var item = { company: g.company, substance: g.substance, totalOrdered: g.totalOrdered, received: rec, unit: unitFor(data, g.substance), pending: g.totalOrdered - rec };
+      if (rec >= g.totalOrdered) completed.push(item); else pending.push(item);
+    });
+
+    function byCompany(a, b) { return a.company === b.company ? (a.substance < b.substance ? -1 : 1) : (a.company < b.company ? -1 : 1); }
+    completed.sort(byCompany);
+    pending.sort(byCompany);
+    return { completed: completed, pending: pending };
+  }
+
+  function groupItemsByCompany(items) {
+    var map = {}, order = [];
+    items.forEach(function (it) {
+      if (!map[it.company]) { map[it.company] = []; order.push(it.company); }
+      map[it.company].push(it);
+    });
+    return order.map(function (name) { return { company: name, items: map[name] }; });
+  }
+
+  function renderFulfillmentColumn(items, emptyText, showPending) {
+    if (!items.length) return '<p class="order-empty">' + emptyText + '</p>';
+    return groupItemsByCompany(items).map(function (g) {
+      return '<div class="fulfillment-company"><div class="fulfillment-company__name">' + g.company + '</div>' +
+        g.items.map(function (it) {
+          var valueText = showPending
+            ? fmt(it.received) + " / " + fmt(it.totalOrdered) + " " + it.unit
+            : fmt(it.totalOrdered) + " " + it.unit;
+          return '<div class="fulfillment-item"><span>' + it.substance + '</span><b>' + valueText + '</b></div>';
+        }).join("") +
+      '</div>';
+    }).join("");
+  }
+
+  function renderOrderFulfillment(data) {
+    var wrap = document.getElementById("fulfillmentColumns");
+    if (!wrap) return;
+    var stats = computeGlobalFulfillment(data);
+    wrap.innerHTML =
+      '<div><div class="fulfillment-col__title">Дууссан захиалга</div>' + renderFulfillmentColumn(stats.completed, "Дууссан захиалга алга.", false) + '</div>' +
+      '<div><div class="fulfillment-col__title">Хүлээгдэж буй захиалга</div>' + renderFulfillmentColumn(stats.pending, "Хүлээгдэж буй захиалга алга.", true) + '</div>';
+  }
+
   function render(data) {
     state.data = data;
     renderCurrent();
+    renderOrderFulfillment(data);
   }
 
   function loadData(bust) {
