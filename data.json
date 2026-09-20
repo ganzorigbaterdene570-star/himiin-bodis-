@@ -265,6 +265,13 @@
       "substance": "Керосин",
       "amount": 4000,
       "unitPrice": 7785000
+    },
+    {
+      "date": "2026.07.28",
+      "company": "Цэцүүх ХХК",
+      "substance": "Мочевин",
+      "amount": 60000,
+      "unitPrice": 4900
     }
   ]
 }
