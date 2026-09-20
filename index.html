@@ -420,6 +420,7 @@
       <span class="panel__hint">Захиалсан тоо хэмжээ, үнийг бүртгэнэ</span>
     </div>
     <form id="orderForm">
+      <div class="editing-banner" id="orderEditingBanner" style="display:none;">Захиалга засаж байна…</div>
       <div class="form-row" style="grid-template-columns: repeat(5, 1fr);">
         <div class="field">
           <label for="oDate">Огноо</label>
@@ -448,6 +449,7 @@
       </div>
       <div class="form-actions" style="margin-top:12px;">
         <button class="btn btn--primary" id="orderSubmitBtn" type="submit">Захиалга нэмж, GitHub-д commit хийх</button>
+        <button class="btn btn--ghost" id="cancelOrderEditBtn" type="button" style="display:none;">Цуцлах</button>
       </div>
     </form>
     <div class="status-msg" id="orderStatusMsg"></div>
@@ -464,7 +466,7 @@
     path: "data.json"
   };
 
-  var state = { data: null, editIndex: null, editSnapshot: null, selectedSubstance: null };
+  var state = { data: null, editIndex: null, editSnapshot: null, selectedSubstance: null, orderEditIndex: null, orderEditSnapshot: null };
 
   function unitFor(data, substanceName) {
     var s = (data.substances || []).filter(function (x) { return x.name === substanceName; })[0];
@@ -835,6 +837,7 @@
         '<td class="num">' + (o.unitPrice ? fmtMoney(o.unitPrice) + "₮" : "—") + "</td>" +
         '<td class="num">' + (totalPrice !== null ? fmtMoney(totalPrice) + "₮" : "—") + "</td>" +
         '<td class="num action-col"><div class="row-actions">' +
+          '<button type="button" class="edit-btn" data-idx="' + idx + '">Засах</button>' +
           '<button type="button" class="del-btn" data-idx="' + idx + '">Устгах</button>' +
         '</div></td>';
       body.appendChild(tr);
@@ -847,6 +850,12 @@
         if (!o) return;
         var ok = confirm("Захиалгыг устгах уу?\n\n" + o.date + " · " + o.company + " · " + fmt(o.amount) + " " + unitFor(state.data, o.substance) + " · " + o.substance);
         if (ok) deleteOrder(idx, o, btn);
+      });
+    });
+    body.querySelectorAll(".edit-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var idx = parseInt(btn.dataset.idx, 10);
+        startOrderEdit(idx);
       });
     });
   }
@@ -1207,6 +1216,98 @@
     });
   }
 
+  function startOrderEdit(idx) {
+    var o = state.data.orders[idx];
+    if (!o) return;
+
+    if (!adminPanel.classList.contains("is-open")) {
+      adminPanel.classList.add("is-open");
+      document.body.classList.add("admin-mode");
+    }
+
+    document.getElementById("oDate").value = o.date.replace(/\./g, "-");
+    var substanceSel = document.getElementById("oSubstance");
+    if (Array.prototype.some.call(substanceSel.options, function (opt) { return opt.value === o.substance; })) {
+      substanceSel.value = o.substance;
+    }
+    var companySel = document.getElementById("oCompany");
+    if (Array.prototype.some.call(companySel.options, function (opt) { return opt.value === o.company; })) {
+      companySel.value = o.company;
+    }
+    document.getElementById("newOrderCompanyField").style.display = "none";
+    document.getElementById("oAmount").value = o.amount;
+    document.getElementById("oUnitPrice").value = o.unitPrice != null ? o.unitPrice : "";
+
+    state.orderEditIndex = idx;
+    state.orderEditSnapshot = { date: o.date, company: o.company, substance: o.substance, amount: o.amount, unitPrice: o.unitPrice };
+
+    document.getElementById("orderEditingBanner").style.display = "block";
+    document.getElementById("cancelOrderEditBtn").style.display = "inline-flex";
+    document.getElementById("orderSubmitBtn").textContent = "Захиалга засах, GitHub-д commit хийх";
+    document.getElementById("orderStatusMsg").className = "status-msg";
+    adminPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function cancelOrderEdit() {
+    state.orderEditIndex = null;
+    state.orderEditSnapshot = null;
+    document.getElementById("orderEditingBanner").style.display = "none";
+    document.getElementById("cancelOrderEditBtn").style.display = "none";
+    document.getElementById("orderSubmitBtn").textContent = "Захиалга нэмж, GitHub-д commit хийх";
+    document.getElementById("orderForm").reset();
+    document.getElementById("newOrderCompanyField").style.display = "none";
+  }
+
+  document.getElementById("cancelOrderEditBtn").addEventListener("click", cancelOrderEdit);
+
+  function updateOrder(idx, expected, updated, btn) {
+    var token = localStorage.getItem(TOKEN_KEY);
+    if (!token) { setOrderStatus("Эхлээд GitHub token-оо оруулж хадгална уу.", "error"); return; }
+
+    if (btn) btn.disabled = true;
+    setOrderStatus("GitHub руу илгээж байна…", "busy");
+    var apiBase = apiBaseUrl();
+
+    fetch(apiBase + "?ref=" + CONFIG.branch, {
+      headers: { "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json" }
+    }).then(function (r) {
+      if (!r.ok) throw new Error("Одоогийн файлыг уншиж чадсангүй (HTTP " + r.status + "). Token эсвэл эрхээ шалгана уу.");
+      return r.json();
+    }).then(function (fileInfo) {
+      var current = JSON.parse(b64DecodeUtf8(fileInfo.content));
+      var o = (current.orders || [])[idx];
+      if (!o || o.date !== expected.date || o.company !== expected.company || o.substance !== expected.substance || o.amount !== expected.amount) {
+        throw new Error("Файл өөр хэн нэгнээр өөрчлөгдсөн байна. Хуудсыг дахин ачаалж (F5), дахин оролдоно уу.");
+      }
+      current.orders[idx] = { date: updated.date, company: updated.company, substance: updated.substance, amount: updated.amount, unitPrice: updated.unitPrice };
+      if (current.companies.indexOf(updated.company) === -1) current.companies.push(updated.company);
+      var today = new Date();
+      current.lastUpdated = today.getFullYear() + "." + String(today.getMonth() + 1).padStart(2, "0") + "." + String(today.getDate()).padStart(2, "0");
+
+      var newContent = JSON.stringify(current, null, 2);
+      return fetch(apiBase, {
+        method: "PUT",
+        headers: { "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json", "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: "Захиалга засав: " + expected.date + " → " + updated.date + " " + updated.company + " " + updated.substance + " " + updated.amount,
+          content: b64EncodeUtf8(newContent),
+          sha: fileInfo.sha,
+          branch: CONFIG.branch
+        })
+      });
+    }).then(function (r) {
+      if (!r.ok) return r.json().then(function (j) { throw new Error("Commit амжилтгүй (HTTP " + r.status + "): " + (j.message || "")); });
+      setOrderStatus("Амжилттай засагдлаа! Хуудас удахгүй шинэчлэгдэнэ.", "ok");
+      state.selectedSubstance = updated.substance;
+      cancelOrderEdit();
+      return loadData(true).then(render);
+    }).catch(function (err) {
+      setOrderStatus(err.message, "error");
+    }).finally(function () {
+      if (btn) btn.disabled = false;
+    });
+  }
+
   document.getElementById("orderForm").addEventListener("submit", function (e) {
     e.preventDefault();
     var token = localStorage.getItem(TOKEN_KEY);
@@ -1227,6 +1328,12 @@
     if (!amount || amount <= 0) { setOrderStatus("Тоо хэмжээ буруу байна.", "error"); return; }
 
     var submitBtn = document.getElementById("orderSubmitBtn");
+
+    if (state.orderEditIndex !== null) {
+      updateOrder(state.orderEditIndex, state.orderEditSnapshot, { date: date, company: company, substance: substance, amount: amount, unitPrice: unitPrice }, submitBtn);
+      return;
+    }
+
     submitBtn.disabled = true;
     setOrderStatus("GitHub руу илгээж байна…", "busy");
 
