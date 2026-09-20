@@ -272,6 +272,13 @@
       "substance": "Мочевин",
       "amount": 60000,
       "unitPrice": 4900
+    },
+    {
+      "date": "2025.11.07",
+      "company": "МСМ",
+      "substance": "Хандлагч-Ликс 984",
+      "amount": 80.1,
+      "unitPrice": 42600
     }
   ]
 }
