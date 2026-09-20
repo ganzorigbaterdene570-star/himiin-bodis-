@@ -191,6 +191,16 @@
   .top-actions { display: flex; gap: 8px; align-self: flex-start; }
 
   /* ---------- Substance tabs ---------- */
+  .substance-disclosure { background: var(--surface-raised); border: 1px solid var(--border); border-radius: 14px;
+    box-shadow: var(--shadow); padding: 14px 18px; }
+  .substance-disclosure > summary { cursor: pointer; list-style: none; display: flex; align-items: center;
+    gap: 10px; font-size: 14.5px; font-weight: 700; }
+  .substance-disclosure > summary::-webkit-details-marker { display: none; }
+  .substance-disclosure__current { font-size: 12.5px; font-weight: 500; color: var(--ink-400); }
+  .substance-disclosure__chevron { margin-left: auto; color: var(--ink-400); transition: transform 0.15s ease; }
+  .substance-disclosure[open] .substance-disclosure__chevron { transform: rotate(180deg); }
+  .substance-disclosure .substance-search-wrap { margin-top: 12px; }
+  .substance-disclosure .substance-tabs { margin-top: 10px; }
   .substance-search-wrap { display: flex; }
   .substance-search { font: inherit; width: 100%; max-width: 320px; padding: 9px 14px; border-radius: 999px;
     border: 1px solid var(--border); background: var(--surface-raised); color: var(--ink-900); }
@@ -255,10 +265,17 @@
     </div>
   </header>
 
-  <div class="substance-search-wrap">
-    <input type="text" id="substanceSearch" class="substance-search" placeholder="Бодис хайх…" autocomplete="off" />
-  </div>
-  <div class="substance-tabs" id="substanceTabs"></div>
+  <details class="substance-disclosure" id="substanceDisclosure">
+    <summary>
+      <span>Химийн бодисууд</span>
+      <span class="substance-disclosure__current" id="substanceCurrentLabel"></span>
+      <span class="substance-disclosure__chevron" aria-hidden="true">▾</span>
+    </summary>
+    <div class="substance-search-wrap">
+      <input type="text" id="substanceSearch" class="substance-search" placeholder="Бодис хайх…" autocomplete="off" />
+    </div>
+    <div class="substance-tabs" id="substanceTabs"></div>
+  </details>
 
   <section class="kpis" id="kpis">
     <div class="kpi">
@@ -926,6 +943,10 @@
   function renderSubstanceTabs(data) {
     var wrap = document.getElementById("substanceTabs");
     wrap.innerHTML = "";
+
+    var current = (data.substances || []).filter(function (s) { return s.name === state.selectedSubstance; })[0];
+    document.getElementById("substanceCurrentLabel").textContent = current ? current.name + " (" + current.unit + ")" : "";
+
     var query = (document.getElementById("substanceSearch").value || "").trim().toLowerCase();
     var list = (data.substances || []).filter(function (s) {
       return !query || s.name.toLowerCase().indexOf(query) !== -1;
@@ -942,6 +963,7 @@
       btn.addEventListener("click", function () {
         state.selectedSubstance = s.name;
         renderCurrent();
+        document.getElementById("substanceDisclosure").removeAttribute("open");
       });
       wrap.appendChild(btn);
     });
