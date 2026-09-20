@@ -207,6 +207,9 @@
   @media (max-width: 760px) {
     .fulfillment-columns { grid-template-columns: 1fr; }
   }
+  .search-fulfillment-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; }
+  .search-fulfillment-row .substance-search-wrap { flex: 0 0 auto; }
+  .fulfillment-disclosure-inline { flex: 1 1 260px; min-width: 240px; }
   .substance-search-wrap { display: flex; }
   .substance-search { font: inherit; width: 100%; max-width: 320px; padding: 9px 14px; border-radius: 999px;
     border: 1px solid var(--border); background: var(--surface-raised); color: var(--ink-900); }
@@ -268,18 +271,20 @@
     </div>
   </header>
 
-  <div class="substance-search-wrap">
-    <input type="text" id="substanceSearch" class="substance-search" placeholder="Бодис хайх…" autocomplete="off" />
-  </div>
+  <div class="search-fulfillment-row">
+    <div class="substance-search-wrap">
+      <input type="text" id="substanceSearch" class="substance-search" placeholder="Бодис хайх…" autocomplete="off" />
+    </div>
 
-  <details class="substance-disclosure" id="fulfillmentDisclosure">
-    <summary>
-      <span>Захиалгын гүйцэтгэл</span>
-      <span class="substance-disclosure__current">Бүх бодис, компаниар</span>
-      <span class="substance-disclosure__chevron" aria-hidden="true">▾</span>
-    </summary>
-    <div class="fulfillment-columns" id="fulfillmentColumns"></div>
-  </details>
+    <details class="substance-disclosure fulfillment-disclosure-inline" id="fulfillmentDisclosure">
+      <summary>
+        <span>Захиалгын гүйцэтгэл</span>
+        <span class="substance-disclosure__current">Бүх бодис, компаниар</span>
+        <span class="substance-disclosure__chevron" aria-hidden="true">▾</span>
+      </summary>
+      <div class="fulfillment-columns" id="fulfillmentColumns"></div>
+    </details>
+  </div>
 
   <details class="substance-disclosure" id="substanceDisclosure">
     <summary>
