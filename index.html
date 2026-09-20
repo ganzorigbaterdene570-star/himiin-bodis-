@@ -531,6 +531,10 @@
     var income = txns.filter(function (t) { return t.type === "Орлого"; }).reduce(function (s, t) { return s + t.amount; }, 0);
     var expense = txns.filter(function (t) { return t.type === "Зарлага"; }).reduce(function (s, t) { return s + t.amount; }, 0);
 
+    var supplierSet = {};
+    txns.forEach(function (t) { if (t.type === "Орлого") supplierSet[t.company] = true; });
+    var supplierCount = Object.keys(supplierSet).length;
+
     var byCompany = {};
     var companiesWithTxns = {};
     (data.companies || []).forEach(function (c) { byCompany[c] = 0; });
@@ -544,7 +548,7 @@
       return { name: name, amount: byCompany[name] };
     }).sort(function (a, b) { return b.amount - a.amount; });
 
-    return { points: points, income: income, expense: expense, balance: income - expense, companyRows: companyRows };
+    return { points: points, income: income, expense: expense, balance: income - expense, companyRows: companyRows, supplierCount: supplierCount };
   }
 
   function fmtMoney(n) {
@@ -607,8 +611,8 @@
 
     if (derived.points.length) {
       document.getElementById("kpiRange").textContent = derived.points[0].date + " – " + derived.points[derived.points.length - 1].date;
-      document.getElementById("kpiIncomeNote").textContent = (data.companies || []).length + " нийлүүлэгчээс";
     }
+    document.getElementById("kpiIncomeNote").textContent = derived.supplierCount + " нийлүүлэгчээс";
   }
 
   function renderTrend(derived, unit) {
