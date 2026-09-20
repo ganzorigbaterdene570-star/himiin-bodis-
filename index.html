@@ -102,6 +102,14 @@
     border: 1px solid var(--border); overflow: hidden; cursor: pointer; }
   .bar-fill { position: absolute; inset: 0 auto 0 0; border-radius: 6px; background: linear-gradient(90deg, var(--copper-soft-strong), var(--copper)); }
 
+  .order-stats { display: flex; flex-wrap: wrap; gap: 22px; }
+  .order-stat { display: flex; flex-direction: column; gap: 4px; min-width: 130px; }
+  .order-stat__label { font-size: 11.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400); }
+  .order-stat__value { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+  .order-stat__value.is-over { color: var(--bad); }
+  .order-fill--good { background: linear-gradient(90deg, var(--good-soft), var(--good)); }
+  .order-empty { font-size: 13px; color: var(--ink-400); }
+
   .table-wrap { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 640px; }
   thead th { text-align: left; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-400);
@@ -258,6 +266,32 @@
     </div>
   </section>
 
+  <section class="panel" id="orderPanel">
+    <div class="panel__head">
+      <span class="panel__title">Захиалга ба гүйцэтгэл</span>
+      <span class="panel__hint" id="orderHint">Захиалсан хэмжээнээс хэдэн хувь нь ирсэн бэ</span>
+    </div>
+    <div class="order-stats" id="orderStats"></div>
+    <div class="bar-row" id="orderProgressRow" style="margin-top:2px;">
+      <div class="bar-row__top">
+        <span class="bar-row__name">Гүйцэтгэл</span>
+        <span class="bar-row__value" id="orderPercentLabel">—</span>
+      </div>
+      <div class="bar-track"><div class="bar-fill order-fill--good" id="orderProgressFill" style="width:0%"></div></div>
+    </div>
+    <div class="table-wrap" id="orderTableWrap" style="margin-top:6px;">
+      <table>
+        <thead>
+          <tr>
+            <th>Огноо</th><th class="num">Захиалсан</th><th class="num">Нэгж үнэ</th><th class="num">Нийт үнэ</th>
+            <th class="num action-col">Үйлдэл</th>
+          </tr>
+        </thead>
+        <tbody id="orderBody"></tbody>
+      </table>
+    </div>
+  </section>
+
   <section class="grid-2">
     <div class="panel">
       <div class="panel__head">
@@ -374,6 +408,37 @@
       </div>
     </form>
     <div class="status-msg" id="statusMsg"></div>
+
+    <hr style="border:none; border-top:1px solid var(--border); margin:6px 0;" />
+
+    <div class="panel__head">
+      <span class="panel__title">Админ · Шинэ захиалга нэмэх</span>
+      <span class="panel__hint">Захиалсан тоо хэмжээ, үнийг бүртгэнэ</span>
+    </div>
+    <form id="orderForm">
+      <div class="form-row" style="grid-template-columns: repeat(4, 1fr);">
+        <div class="field">
+          <label for="oDate">Огноо</label>
+          <input type="date" id="oDate" required />
+        </div>
+        <div class="field">
+          <label for="oSubstance">Бодис</label>
+          <select id="oSubstance" required></select>
+        </div>
+        <div class="field">
+          <label for="oAmount">Захиалсан тоо хэмжээ</label>
+          <input type="number" id="oAmount" step="0.01" min="0" required />
+        </div>
+        <div class="field">
+          <label for="oUnitPrice">Нэгж үнэ (₮, заавал биш)</label>
+          <input type="number" id="oUnitPrice" step="0.01" min="0" />
+        </div>
+      </div>
+      <div class="form-actions" style="margin-top:12px;">
+        <button class="btn btn--primary" id="orderSubmitBtn" type="submit">Захиалга нэмж, GitHub-д commit хийх</button>
+      </div>
+    </form>
+    <div class="status-msg" id="orderStatusMsg"></div>
   </section>
 
 </div>
@@ -468,6 +533,19 @@
     }).sort(function (a, b) { return b.amount - a.amount; });
 
     return { points: points, income: income, expense: expense, balance: income - expense, companyRows: companyRows };
+  }
+
+  function fmtMoney(n) {
+    return Math.round(n).toLocaleString("mn-MN");
+  }
+
+  function computeOrderStats(data, substanceName, income) {
+    var orders = (data.orders || []).filter(function (o) { return o.substance === substanceName; })
+      .slice().sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+    var totalOrdered = orders.reduce(function (s, o) { return s + o.amount; }, 0);
+    var pending = totalOrdered - income;
+    var percent = totalOrdered > 0 ? Math.min(999, (income / totalOrdered) * 100) : 0;
+    return { orders: orders, totalOrdered: totalOrdered, received: income, pending: pending, percent: percent };
   }
 
   function renderKpis(derived, data, substanceName, unit) {
@@ -644,6 +722,55 @@
     });
   }
 
+  function renderOrders(orderStats, unit, originalOrders) {
+    var statsWrap = document.getElementById("orderStats");
+    var pendingIsOver = orderStats.pending < 0;
+    statsWrap.innerHTML =
+      '<div class="order-stat"><span class="order-stat__label">Захиалсан</span>' +
+        '<span class="order-stat__value">' + fmt(orderStats.totalOrdered) + " " + unit + '</span></div>' +
+      '<div class="order-stat"><span class="order-stat__label">Ирсэн</span>' +
+        '<span class="order-stat__value">' + fmt(orderStats.received) + " " + unit + '</span></div>' +
+      '<div class="order-stat"><span class="order-stat__label">' + (pendingIsOver ? "Илүү ирсэн" : "Хүлээгдэж буй") + '</span>' +
+        '<span class="order-stat__value' + (pendingIsOver ? " is-over" : "") + '">' + fmt(Math.abs(orderStats.pending)) + " " + unit + '</span></div>';
+
+    var pct = Math.max(0, Math.min(100, orderStats.percent));
+    document.getElementById("orderProgressFill").style.width = pct + "%";
+    document.getElementById("orderPercentLabel").textContent = orderStats.totalOrdered > 0
+      ? orderStats.percent.toFixed(1) + "%"
+      : "Захиалга алга";
+
+    var body = document.getElementById("orderBody");
+    body.innerHTML = "";
+    if (!orderStats.orders.length) {
+      body.innerHTML = '<tr><td colspan="5" class="order-empty">Энэ бодист захиалга бүртгэгдээгүй байна.</td></tr>';
+      return;
+    }
+    orderStats.orders.slice().reverse().forEach(function (o) {
+      var idx = originalOrders.indexOf(o);
+      var totalPrice = o.unitPrice ? o.amount * o.unitPrice : null;
+      var tr = document.createElement("tr");
+      tr.innerHTML =
+        "<td>" + o.date + "</td>" +
+        '<td class="num">' + fmt(o.amount) + " " + unit + "</td>" +
+        '<td class="num">' + (o.unitPrice ? fmtMoney(o.unitPrice) + "₮" : "—") + "</td>" +
+        '<td class="num">' + (totalPrice !== null ? fmtMoney(totalPrice) + "₮" : "—") + "</td>" +
+        '<td class="num action-col"><div class="row-actions">' +
+          '<button type="button" class="del-btn" data-idx="' + idx + '">Устгах</button>' +
+        '</div></td>';
+      body.appendChild(tr);
+    });
+
+    body.querySelectorAll(".del-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var idx = parseInt(btn.dataset.idx, 10);
+        var o = state.data.orders[idx];
+        if (!o) return;
+        var ok = confirm("Захиалгыг устгах уу?\n\n" + o.date + " · " + fmt(o.amount) + " " + unitFor(state.data, o.substance) + " · " + o.substance);
+        if (ok) deleteOrder(idx, o, btn);
+      });
+    });
+  }
+
   function populateCompanySelect(data) {
     var sel = document.getElementById("fCompany");
     var prev = sel.value;
@@ -674,6 +801,18 @@
     if (prev && Array.prototype.some.call(sel.options, function (o) { return o.value === prev; })) sel.value = prev;
   }
 
+  function populateOrderSubstanceSelect(data) {
+    var sel = document.getElementById("oSubstance");
+    var prev = sel.value || state.selectedSubstance;
+    sel.innerHTML = "";
+    (data.substances || []).forEach(function (s) {
+      var opt = document.createElement("option");
+      opt.value = s.name; opt.textContent = s.name + " (" + s.unit + ")";
+      sel.appendChild(opt);
+    });
+    if (prev && Array.prototype.some.call(sel.options, function (o) { return o.value === prev; })) sel.value = prev;
+  }
+
   function renderSubstanceTabs(data) {
     var wrap = document.getElementById("substanceTabs");
     wrap.innerHTML = "";
@@ -699,13 +838,17 @@
     var unit = unitFor(data, state.selectedSubstance);
     var derived = computeDerived(data, state.selectedSubstance);
 
+    var orderStats = computeOrderStats(data, state.selectedSubstance, derived.income);
+
     renderSubstanceTabs(data);
     renderKpis(derived, data, state.selectedSubstance, unit);
     renderTrend(derived, unit);
     renderBars(derived, unit);
     renderTable(derived, unit, data.transactions);
+    renderOrders(orderStats, unit, data.orders || []);
     populateCompanySelect(data);
     populateSubstanceSelect(data);
+    populateOrderSubstanceSelect(data);
 
     document.getElementById("trendHint").textContent = "Гүйлгээ тус бүрийн дараах үлдэгдэл, " + unit;
     document.getElementById("barsHint").textContent = "Компани тус бүр, " + unit;
@@ -914,6 +1057,114 @@
       btn.disabled = false;
     });
   }
+
+  function setOrderStatus(msg, kind) {
+    var el = document.getElementById("orderStatusMsg");
+    el.className = "status-msg is-" + kind;
+    el.textContent = msg;
+  }
+
+  function deleteOrder(idx, expected, btn) {
+    var token = localStorage.getItem(TOKEN_KEY);
+    if (!token) { setOrderStatus("Эхлээд GitHub token-оо оруулж хадгална уу.", "error"); return; }
+
+    btn.disabled = true;
+    setOrderStatus("Устгаж байна…", "busy");
+    var apiBase = apiBaseUrl();
+
+    fetch(apiBase + "?ref=" + CONFIG.branch, {
+      headers: { "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json" }
+    }).then(function (r) {
+      if (!r.ok) throw new Error("Одоогийн файлыг уншиж чадсангүй (HTTP " + r.status + "). Token эсвэл эрхээ шалгана уу.");
+      return r.json();
+    }).then(function (fileInfo) {
+      var current = JSON.parse(b64DecodeUtf8(fileInfo.content));
+      var o = (current.orders || [])[idx];
+      if (!o || o.date !== expected.date || o.substance !== expected.substance || o.amount !== expected.amount) {
+        throw new Error("Файл өөр хэн нэгнээр өөрчлөгдсөн байна. Хуудсыг дахин ачаалж (F5), дахин оролдоно уу.");
+      }
+      current.orders.splice(idx, 1);
+      var today = new Date();
+      current.lastUpdated = today.getFullYear() + "." + String(today.getMonth() + 1).padStart(2, "0") + "." + String(today.getDate()).padStart(2, "0");
+
+      var newContent = JSON.stringify(current, null, 2);
+      return fetch(apiBase, {
+        method: "PUT",
+        headers: { "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json", "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: "Захиалга устгав: " + o.date + " " + o.substance + " " + o.amount,
+          content: b64EncodeUtf8(newContent),
+          sha: fileInfo.sha,
+          branch: CONFIG.branch
+        })
+      });
+    }).then(function (r) {
+      if (!r.ok) return r.json().then(function (j) { throw new Error("Commit амжилтгүй (HTTP " + r.status + "): " + (j.message || "")); });
+      setOrderStatus("Захиалга устгагдлаа. Хуудас удахгүй шинэчлэгдэнэ.", "ok");
+      return loadData(true).then(render);
+    }).catch(function (err) {
+      setOrderStatus(err.message, "error");
+      btn.disabled = false;
+    });
+  }
+
+  document.getElementById("orderForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var token = localStorage.getItem(TOKEN_KEY);
+    if (!token) { setOrderStatus("Эхлээд GitHub token-оо оруулж хадгална уу.", "error"); return; }
+
+    var dateRaw = document.getElementById("oDate").value;
+    if (!dateRaw) { setOrderStatus("Огноо сонгоно уу.", "error"); return; }
+    var date = dateRaw.replace(/-/g, ".");
+    var substance = document.getElementById("oSubstance").value;
+    var amount = parseFloat(document.getElementById("oAmount").value);
+    var unitPriceRaw = document.getElementById("oUnitPrice").value;
+    var unitPrice = unitPriceRaw ? parseFloat(unitPriceRaw) : null;
+
+    if (!substance) { setOrderStatus("Бодис сонгоно уу.", "error"); return; }
+    if (!amount || amount <= 0) { setOrderStatus("Тоо хэмжээ буруу байна.", "error"); return; }
+
+    var submitBtn = document.getElementById("orderSubmitBtn");
+    submitBtn.disabled = true;
+    setOrderStatus("GitHub руу илгээж байна…", "busy");
+
+    var apiBase = apiBaseUrl();
+
+    fetch(apiBase + "?ref=" + CONFIG.branch, {
+      headers: { "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json" }
+    }).then(function (r) {
+      if (!r.ok) throw new Error("Одоогийн файлыг уншиж чадсангүй (HTTP " + r.status + "). Token эсвэл эрхээ шалгана уу.");
+      return r.json();
+    }).then(function (fileInfo) {
+      var current = JSON.parse(b64DecodeUtf8(fileInfo.content));
+      if (!current.orders) current.orders = [];
+      current.orders.push({ date: date, substance: substance, amount: amount, unitPrice: unitPrice });
+      var today = new Date();
+      current.lastUpdated = today.getFullYear() + "." + String(today.getMonth() + 1).padStart(2, "0") + "." + String(today.getDate()).padStart(2, "0");
+
+      var newContent = JSON.stringify(current, null, 2);
+      return fetch(apiBase, {
+        method: "PUT",
+        headers: { "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json", "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: "Захиалга нэмэв: " + date + " " + substance + " " + amount,
+          content: b64EncodeUtf8(newContent),
+          sha: fileInfo.sha,
+          branch: CONFIG.branch
+        })
+      });
+    }).then(function (r) {
+      if (!r.ok) return r.json().then(function (j) { throw new Error("Commit амжилтгүй (HTTP " + r.status + "): " + (j.message || "")); });
+      setOrderStatus("Амжилттай! GitHub дээр commit хийгдлээ. Хуудас удахгүй шинэчлэгдэнэ.", "ok");
+      state.selectedSubstance = substance;
+      document.getElementById("orderForm").reset();
+      return loadData(true).then(render);
+    }).catch(function (err) {
+      setOrderStatus(err.message, "error");
+    }).finally(function () {
+      submitBtn.disabled = false;
+    });
+  });
 
   document.getElementById("addForm").addEventListener("submit", function (e) {
     e.preventDefault();
