@@ -102,21 +102,13 @@
   .order-companies { display: flex; flex-direction: column; gap: 20px; }
   .order-company-block { display: flex; flex-direction: column; gap: 8px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
   .order-company-block:last-child { border-bottom: none; padding-bottom: 0; }
-  .order-split { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 2px; }
-  .order-split__col { display: flex; flex-direction: column; gap: 6px; }
-  .order-split__label { font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-400); }
   .order-stats { display: flex; flex-wrap: wrap; gap: 18px; }
   .order-stat { display: flex; flex-direction: column; gap: 4px; min-width: 100px; }
   .order-stat__label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-400); }
   .order-stat__value { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
   .order-stat__value.is-over { color: var(--bad); }
   .order-fill--good { background: linear-gradient(90deg, var(--good-soft), var(--good)); }
-  .order-fill--money { background: linear-gradient(90deg, rgba(47, 111, 178, 0.18), var(--focus)); }
   .order-empty { font-size: 13px; color: var(--ink-400); }
-
-  @media (max-width: 760px) {
-    .order-split { grid-template-columns: 1fr; }
-  }
 
   .table-wrap { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 640px; }
@@ -824,38 +816,20 @@
     orderStats.groups.forEach(function (g) {
       var pendingIsOver = g.pending < 0;
       var pct = Math.max(0, Math.min(100, g.percent));
-      var pendingValueIsOver = g.pendingValue < 0;
-      var pctValue = Math.max(0, Math.min(100, g.percentValue));
 
       var block = document.createElement("div");
       block.className = "order-company-block";
       block.innerHTML =
-        '<div class="bar-row__top"><span class="bar-row__name">' + g.company + '</span></div>' +
-        '<div class="order-split">' +
-          '<div class="order-split__col">' +
-            '<div class="order-split__label">Тоо хэмжээ</div>' +
-            '<div class="bar-row__top"><span class="bar-row__note">Гүйцэтгэл</span><span class="bar-row__value">' + (g.totalOrdered > 0 ? g.percent.toFixed(1) + "%" : "—") + '</span></div>' +
-            '<div class="bar-track"><div class="bar-fill order-fill--good" style="width:' + pct + '%"></div></div>' +
-            '<div class="order-stats">' +
-              '<div class="order-stat"><span class="order-stat__label">Захиалсан</span><span class="order-stat__value">' + fmt(g.totalOrdered) + " " + unit + '</span></div>' +
-              '<div class="order-stat"><span class="order-stat__label">Ирсэн</span><span class="order-stat__value">' + fmt(g.received) + " " + unit + '</span></div>' +
-              '<div class="order-stat"><span class="order-stat__label">' + (pendingIsOver ? "Илүү ирсэн" : "Хүлээгдэж буй") + '</span>' +
-                '<span class="order-stat__value' + (pendingIsOver ? " is-over" : "") + '">' + fmt(Math.abs(g.pending)) + " " + unit + '</span></div>' +
-            '</div>' +
-          '</div>' +
-          '<div class="order-split__col">' +
-            '<div class="order-split__label">Үнийн дүн (тооцоолсон)</div>' +
-            (g.hasPricing
-              ? ('<div class="bar-row__top"><span class="bar-row__note">Гүйцэтгэл</span><span class="bar-row__value">' + g.percentValue.toFixed(1) + "%</span></div>" +
-                '<div class="bar-track"><div class="bar-fill order-fill--money" style="width:' + pctValue + '%"></div></div>' +
-                '<div class="order-stats">' +
-                  '<div class="order-stat"><span class="order-stat__label">Захиалсан</span><span class="order-stat__value">' + fmtMoney(g.totalOrderedValue) + "₮</span></div>" +
-                  '<div class="order-stat"><span class="order-stat__label">Ирсэн</span><span class="order-stat__value">' + fmtMoney(g.receivedValue) + "₮</span></div>" +
-                  '<div class="order-stat"><span class="order-stat__label">' + (pendingValueIsOver ? "Илүү ирсэн" : "Хүлээгдэж буй") + '</span>' +
-                    '<span class="order-stat__value' + (pendingValueIsOver ? " is-over" : "") + '">' + fmtMoney(Math.abs(g.pendingValue)) + "₮</span></div>" +
-                '</div>')
-              : '<p class="order-empty">Нэгж үнэ оруулаагүй тул тооцоолох боломжгүй.</p>') +
-          '</div>' +
+        '<div class="bar-row__top">' +
+          '<span class="bar-row__name">' + g.company + '</span>' +
+          '<span class="bar-row__value">' + (g.totalOrdered > 0 ? g.percent.toFixed(1) + "%" : "—") + '</span>' +
+        '</div>' +
+        '<div class="bar-track"><div class="bar-fill order-fill--good" style="width:' + pct + '%"></div></div>' +
+        '<div class="order-stats">' +
+          '<div class="order-stat"><span class="order-stat__label">Захиалсан</span><span class="order-stat__value">' + fmt(g.totalOrdered) + " " + unit + '</span></div>' +
+          '<div class="order-stat"><span class="order-stat__label">Ирсэн</span><span class="order-stat__value">' + fmt(g.received) + " " + unit + '</span></div>' +
+          '<div class="order-stat"><span class="order-stat__label">' + (pendingIsOver ? "Илүү ирсэн" : "Хүлээгдэж буй") + '</span>' +
+            '<span class="order-stat__value' + (pendingIsOver ? " is-over" : "") + '">' + fmt(Math.abs(g.pending)) + " " + unit + '</span></div>' +
         '</div>';
       wrap.appendChild(block);
     });
